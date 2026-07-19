@@ -1,0 +1,23 @@
+# Build and release output
+dist/
+release-stage-*/
+source-stage*/
+verify-stage-*/
+
+# Local test dependencies and caches
+testdeps/
+**/__pycache__/
+*.py[cod]
+
+# Compiled artifacts
+*.dll
+*.exe
+*.pdb
+
+# Editor and OS files
+.vs/
+.vscode/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
