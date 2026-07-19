@@ -1,0 +1,67 @@
+{
+  "id": "maimai_link",
+  "name": "maimai DX · DGHub 联动",
+  "version": "1.1.0",
+  "sdk": "1",
+  "author": "MaiDGBridge",
+  "description": "接收本机 MaiDGBridge 的 maimai DX 实时判定数据，并按判定等级触发 DGHub。",
+  "entry": "main.py",
+  "capabilities": { "startup_check": true },
+  "config_schema": [
+    {
+      "section": "连接",
+      "fields": [
+        {
+          "key": "endpoint",
+          "type": "text",
+          "label": "MaiDGBridge 数据端点",
+          "default": "http://127.0.0.1:8891/events",
+          "description": "游戏 Mods 目录中的 MaiDGBridge.dll 提供的本机 SSE 地址"
+        },
+        { "key": "debug", "type": "bool", "label": "调试日志", "default": false }
+      ]
+    },
+    {
+      "section": "玩家",
+      "fields": [
+        { "key": "p1_enabled", "type": "bool", "label": "接收 1P 判定", "default": true },
+        { "key": "p2_enabled", "type": "bool", "label": "接收 2P 判定", "default": false }
+      ]
+    },
+    {
+      "section": "实时判定",
+      "fields": [
+        { "key": "judge_duration", "type": "duration", "label": "持续时间", "default": 1.0 },
+        { "key": "judge_preset", "type": "preset", "label": "波形预设", "default": "CS2-受伤" },
+        { "key": "channel", "type": "channel", "label": "输出通道", "default": "both" },
+        {
+          "key": "stack_by_count",
+          "type": "bool",
+          "label": "同帧判定叠加强度",
+          "default": false,
+          "description": "同一数据帧出现多个相同判定时，将强度乘以数量并限制在 100%"
+        },
+        { "key": "miss_enabled", "type": "bool", "label": "MISS 触发", "default": true },
+        { "key": "miss_strength", "type": "percent", "label": "MISS 强度", "default": 40 },
+        { "key": "good_enabled", "type": "bool", "label": "GOOD 触发", "default": false },
+        { "key": "good_strength", "type": "percent", "label": "GOOD 强度", "default": 25 },
+        { "key": "great_enabled", "type": "bool", "label": "GREAT 触发", "default": false },
+        { "key": "great_strength", "type": "percent", "label": "GREAT 强度", "default": 15 },
+        { "key": "perfect_enabled", "type": "bool", "label": "PERFECT 触发", "default": false },
+        { "key": "perfect_strength", "type": "percent", "label": "PERFECT 强度", "default": 8 },
+        { "key": "critical_enabled", "type": "bool", "label": "CRITICAL 触发", "default": false },
+        { "key": "critical_strength", "type": "percent", "label": "CRITICAL 强度", "default": 5 }
+      ]
+    },
+    {
+      "section": "曲目结束",
+      "fields": [
+        { "key": "settle_enabled", "type": "bool", "label": "结算触发", "default": false },
+        { "key": "settle_no_miss_only", "type": "bool", "label": "仅无 MISS 时触发", "default": false },
+        { "key": "settle_strength", "type": "percent", "label": "结算强度", "default": 25 },
+        { "key": "settle_duration", "type": "duration", "label": "结算持续时间", "default": 2.0 },
+        { "key": "settle_preset", "type": "preset", "label": "结算波形预设", "default": "CS2-受伤" }
+      ]
+    }
+  ]
+}
