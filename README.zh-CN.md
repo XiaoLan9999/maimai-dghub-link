@@ -18,17 +18,21 @@ Sinmai / MelonLoader
 
 ## 安装
 
-1. 将 `game-mod/MaiDGBridge.dll` 复制到游戏的 `Package/Mods`。
-2. 将 `game-mod/MaiDGBridge.ini` 复制到游戏的 `Package` 根目录。
-3. 在 DGHub 中导入 `maimai_link-1.1.0.zip`。
-4. 启动 DGHub 和游戏。二者启动顺序不限，DGHub 插件会自动重连。
+1. 在 DGHub 中导入 `maimai_link-1.2.0.zip`，然后启用插件。
+2. 如果游戏正在运行，插件会自动识别它的 `Package` 目录并安装内置桥接。安装完成后重启一次游戏，让 MelonLoader 加载桥接。
+3. 如果游戏尚未运行或没有自动识别，在插件配置的“游戏 Package 目录”中选择包含 `Sinmai.exe` 的目录，插件会立即安装。
 
-典型包体的对应目录为：
+正常流程不再需要用户手动复制 DLL。自动安装器会：
 
-```text
-<游戏目录>\Package\Mods
-<游戏目录>\Package
-```
+- 在安装前通过 SHA-256 校验内置桥接；
+- 将 `MaiDGBridge.dll` 安装到 `Package/Mods`，仅在缺少时创建 `MaiDGBridge.ini`；
+- 更新时保留用户已有的 INI 配置；
+- 将被替换的旧文件备份到 `Package/MaiDGBridge.backups/<时间戳>`；
+- 游戏正在使用旧版 DLL 时不强行覆盖，关闭游戏后自动继续更新。
+
+自动识别只检查名为 `Sinmai.exe` 的运行进程，不会扫描整块硬盘。完成首次安装后，DGHub 和游戏的启动顺序不限，插件会自动重连。
+
+如需手动安装，可以从插件 ZIP 的 `payload` 目录提取 `MaiDGBridge.dll` 和 `MaiDGBridge.ini`，分别复制到 `Package/Mods` 与 `Package`。
 
 默认只启用 1P 的 MISS 触发。GOOD、GREAT、PERFECT、CRITICAL、2P、同帧强度叠加和曲目结束触发都可以在 DGHub 插件配置中单独开启。
 
@@ -98,7 +102,7 @@ curl.exe -N http://127.0.0.1:8891/events
 
 ## 卸载
 
-删除 `Package/Mods/MaiDGBridge.dll` 和 `Package/MaiDGBridge.ini`，再从 DGHub 中移除 `maimai_link` 插件即可。模块不修改游戏程序集或 AquaMai 配置。
+先在 DGHub 中移除或停用 `maimai_link`，避免插件重新安装桥接；然后删除 `Package/Mods/MaiDGBridge.dll`、`Package/MaiDGBridge.ini` 和 `Package/MaiDGBridge.dghub.json`。`Package/MaiDGBridge.backups` 中的备份可自行保留或删除。模块不修改游戏程序集或 AquaMai 配置。
 
 ## 构建
 
@@ -108,7 +112,11 @@ curl.exe -N http://127.0.0.1:8891/events
 .\build.ps1 -GamePackage "D:\Games\maimai\Package"
 ```
 
-构建脚本使用系统 .NET Framework C# 编译器，并从指定包体引用 MelonLoader 与 `Assembly-CSharp.dll`。
+构建脚本使用系统 .NET Framework C# 编译器，并从指定包体引用 MelonLoader 与 `Assembly-CSharp.dll`，最终生成在 `payload` 中内置桥接的一体化 DGHub ZIP。
+
+## 测试
+
+仓库包含 SSE/WebSocket 端到端测试、自动安装器的识别/备份/升级测试、发布 ZIP 的结构与哈希检查，以及针对多个包体版本的判定钩子编译检查。
 
 ## 许可证
 

@@ -73,7 +73,11 @@ async def main():
         await ws.send(json.dumps({"accepted": True}))
         await ws.send(json.dumps({
             "op": "config",
-            "data": {"endpoint": "http://127.0.0.1:{0}/events".format(sse_port)},
+            "data": {
+                "endpoint": "http://127.0.0.1:{0}/events".format(sse_port),
+                "auto_detect_game": False,
+                "auto_install_bridge": False,
+            },
         }))
 
         async def controller():
@@ -106,6 +110,7 @@ async def main():
         "DGHUB_HOST": "127.0.0.1",
         "DGHUB_PORT": str(ws_port),
         "DGHUB_TOKEN": "integration-token",
+        "DGHUB_PLUGIN_ROOT": str(PLUGIN.parent),
         "PYTHONPATH": str(TESTDEPS),
     })
     process = await asyncio.create_subprocess_exec(

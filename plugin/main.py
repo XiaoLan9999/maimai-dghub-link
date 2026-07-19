@@ -8,6 +8,8 @@ import sys
 import threading
 import urllib.request
 
+from installer import ensure_bridge_installed
+
 try:
     import websockets
 except ImportError:
@@ -16,6 +18,9 @@ except ImportError:
 
 
 DEFAULT_CONFIG = {
+    "game_package": "",
+    "auto_detect_game": True,
+    "auto_install_bridge": True,
     "endpoint": "http://127.0.0.1:8891/events",
     "debug": False,
     "p1_enabled": True,
@@ -171,36 +176,97 @@ async def main():
     host = os.environ["DGHUB_HOST"]
     port = os.environ["DGHUB_PORT"]
     token = os.environ["DGHUB_TOKEN"]
+    plugin_root = os.environ.get(
+        "DGHUB_PLUGIN_ROOT", os.path.dirname(os.path.abspath(__file__))
+    )
     cfg = dict(DEFAULT_CONFIG)
     loop = asyncio.get_running_loop()
     event_queue = asyncio.Queue()
     source = SseClient(loop, event_queue)
     last_counts = {1: None, 2: None}
+    install_wakeup = asyncio.Event()
+    install_state = {
+        "state": "pending",
+        "detail": "等待识别游戏目录",
+        "hint": "启动一次游戏即可自动识别，或在配置中填写 Package 目录",
+        "path_state": "pending",
+        "path_detail": "尚未找到游戏目录",
+        "package": "",
+        "detected": False,
+        "game_running": False,
+        "restart_required": False,
+        "backup": "",
+    }
+    stream_state = {
+        "state": "pending",
+        "detail": "等待 MaiDGBridge 数据流",
+        "hint": "安装桥接后启动游戏；插件会自动重连",
+    }
+    restart_notice = [False]
+    last_status = [None]
 
-    async def report(ws, bridge_state, bridge_detail, display):
+    async def report(ws):
+        bridge_state = dict(install_state)
+        if restart_notice[0] and bridge_state.get("game_running"):
+            bridge_state.update({
+                "state": "warn",
+                "detail": "桥接已安装，需要重启游戏后生效",
+                "hint": "退出并重新启动一次游戏；之后无需重复安装",
+            })
+
+        if stream_state["state"] == "ok":
+            display = "已连接，等待游戏判定"
+        elif restart_notice[0]:
+            display = "桥接已安装，请重启游戏"
+        elif bridge_state.get("state") == "fail":
+            display = "桥接安装失败"
+        elif not bridge_state.get("package"):
+            display = "等待识别游戏目录"
+        else:
+            display = "等待游戏"
+
+        fields = {
+            "display_status": display,
+            "startup_check": {
+                "title": "maimai DX 联动启动检查",
+                "steps": [
+                    {
+                        "key": "plugin",
+                        "title": "DGHub 插件进程",
+                        "state": "ok",
+                        "detail": "已连接 DGHub",
+                    },
+                    {
+                        "key": "game_path",
+                        "title": "游戏目录",
+                        "state": bridge_state.get("path_state", "pending"),
+                        "detail": bridge_state.get("path_detail", "尚未找到游戏目录"),
+                        "hint": "可在插件配置中填写包含 Sinmai.exe 的 Package 目录",
+                    },
+                    {
+                        "key": "bridge_install",
+                        "title": "MaiDGBridge 自动安装",
+                        "state": bridge_state.get("state", "pending"),
+                        "detail": bridge_state.get("detail", "等待安装"),
+                        "hint": bridge_state.get("hint", ""),
+                    },
+                    {
+                        "key": "bridge_stream",
+                        "title": "游戏判定数据",
+                        "state": stream_state["state"],
+                        "detail": stream_state["detail"],
+                        "hint": stream_state["hint"],
+                    },
+                ],
+            },
+        }
+        signature = json.dumps(fields, ensure_ascii=False, sort_keys=True)
+        if signature == last_status[0]:
+            return
+        last_status[0] = signature
         await ws.send(json.dumps({
             "op": "status",
-            "fields": {
-                "display_status": display,
-                "startup_check": {
-                    "title": "maimai DX link startup check",
-                    "steps": [
-                        {
-                            "key": "plugin",
-                            "title": "DGHub plugin process",
-                            "state": "ok",
-                            "detail": "Connected to DGHub",
-                        },
-                        {
-                            "key": "bridge",
-                            "title": "MaiDGBridge game mod",
-                            "state": bridge_state,
-                            "detail": bridge_detail,
-                            "hint": "Copy MaiDGBridge.dll to the game Mods directory and start the game",
-                        },
-                    ],
-                },
-            },
+            "fields": fields,
         }, ensure_ascii=False))
 
     async def log(ws, level, message):
@@ -209,6 +275,58 @@ async def main():
             "level": level,
             "message": message,
         }, ensure_ascii=False))
+
+    async def installer_loop(ws):
+        nonlocal install_state
+        logged_backup = ""
+        while True:
+            try:
+                result = await asyncio.to_thread(
+                    ensure_bridge_installed,
+                    plugin_root,
+                    cfg["game_package"],
+                    bool(cfg["auto_detect_game"]),
+                    bool(cfg["auto_install_bridge"]),
+                )
+            except Exception as exc:
+                result = {
+                    "state": "fail",
+                    "detail": "自动安装检查失败：" + str(exc),
+                    "hint": "重新启用插件；若问题持续，请重新导入官方 ZIP",
+                    "path_state": "pending",
+                    "path_detail": "自动安装检查异常",
+                    "package": "",
+                    "detected": False,
+                    "game_running": False,
+                    "restart_required": False,
+                    "backup": "",
+                }
+            install_state = result
+            if result.get("restart_required"):
+                restart_notice[0] = True
+            elif restart_notice[0] and not result.get("game_running"):
+                restart_notice[0] = False
+
+            detected_package = result.get("package", "")
+            if result.get("detected") and detected_package != cfg["game_package"]:
+                cfg["game_package"] = detected_package
+                await ws.send(json.dumps({
+                    "op": "set_config",
+                    "key": "game_package",
+                    "value": detected_package,
+                }, ensure_ascii=False))
+
+            backup = result.get("backup", "")
+            if backup and backup != logged_backup:
+                logged_backup = backup
+                await log(ws, "info", "桥接旧文件已备份到 " + backup)
+            await report(ws)
+
+            install_wakeup.clear()
+            try:
+                await asyncio.wait_for(install_wakeup.wait(), timeout=3.0)
+            except asyncio.TimeoutError:
+                pass
 
     async def trigger(ws, strength, duration, preset, label):
         strength = max(-100, min(100, as_int(strength)))
@@ -316,21 +434,22 @@ async def main():
             if "_connected" in event:
                 last_counts[1] = None
                 last_counts[2] = None
-                await report(
-                    ws,
-                    "ok",
-                    "Connected to " + event["_connected"],
-                    "Connected; waiting for gameplay",
-                )
+                restart_notice[0] = False
+                stream_state.update({
+                    "state": "ok",
+                    "detail": "已连接 " + event["_connected"],
+                    "hint": "已就绪；开始歌曲后会接收实时判定",
+                })
+                await report(ws)
             elif "_error" in event:
                 last_counts[1] = None
                 last_counts[2] = None
-                await report(
-                    ws,
-                    "pending",
-                    "Not connected ({0}); retrying".format(event["_error"]),
-                    "Waiting for MaiDGBridge",
-                )
+                stream_state.update({
+                    "state": "pending",
+                    "detail": "尚未连接；正在重试（{0}）".format(event["_error"]),
+                    "hint": "确认桥接已安装并启动游戏",
+                })
+                await report(ws)
             elif event.get("event") == "settle":
                 await on_settle(ws, event)
             elif event.get("event") == "state":
@@ -342,7 +461,7 @@ async def main():
 
     uri = "ws://{0}:{1}/ws/plugin?token={2}".format(host, port, token)
     async with websockets.connect(uri) as ws:
-        manifest_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.json")
+        manifest_path = os.path.join(plugin_root, "manifest.json")
         with open(manifest_path, encoding="utf-8") as manifest_file:
             manifest = json.load(manifest_file)
 
@@ -355,8 +474,9 @@ async def main():
         if not acknowledgement.get("accepted"):
             raise RuntimeError(acknowledgement.get("reason", "hello rejected"))
 
-        await report(ws, "pending", "Waiting for MaiDGBridge", "Waiting for game")
+        await report(ws)
         processor = asyncio.create_task(process_events(ws))
+        installer = asyncio.create_task(installer_loop(ws))
         try:
             async for raw in ws:
                 message = json.loads(raw)
@@ -369,12 +489,19 @@ async def main():
                         if key in data:
                             cfg[key] = data[key]
                     source.start(str(cfg["endpoint"]))
+                    install_wakeup.set()
                 elif operation == "config_changed":
                     key = message.get("key")
                     if key in cfg:
                         cfg[key] = message.get("value")
                         if key == "endpoint":
                             source.start(str(cfg["endpoint"]))
+                        elif key in (
+                            "game_package",
+                            "auto_detect_game",
+                            "auto_install_bridge",
+                        ):
+                            install_wakeup.set()
                         elif key in ("p1_enabled", "p2_enabled"):
                             last_counts[1] = None
                             last_counts[2] = None
@@ -383,8 +510,13 @@ async def main():
         finally:
             source.stop()
             processor.cancel()
+            installer.cancel()
             try:
                 await processor
+            except asyncio.CancelledError:
+                pass
+            try:
+                await installer
             except asyncio.CancelledError:
                 pass
 

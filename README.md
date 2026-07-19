@@ -18,17 +18,21 @@ The bridge uses Harmony to hook the game's own `JudgeResultSt.UpdateScore` entry
 
 ## Installation
 
-1. Copy `game-mod/MaiDGBridge.dll` to the game's `Package/Mods` directory.
-2. Copy `game-mod/MaiDGBridge.ini` to the `Package` root directory.
-3. Import `maimai_link-1.1.0.zip` in DGHub.
-4. Start DGHub and the game in either order. The DGHub plugin reconnects automatically.
+1. Import `maimai_link-1.2.0.zip` in DGHub and enable the plugin.
+2. If the game is already running, the plugin detects its `Package` directory and installs the bundled bridge automatically. Restart the game once so MelonLoader can load it.
+3. If the game isn't running or automatic detection doesn't find it, open the plugin configuration and select the directory that contains `Sinmai.exe` under **Game Package directory**. Installation starts immediately.
 
-Typical target directories:
+No manual DLL copy is required. The installer:
 
-```text
-<game directory>\Package\Mods
-<game directory>\Package
-```
+- verifies the bundled bridge with SHA-256 before installation;
+- installs `MaiDGBridge.dll` to `Package/Mods` and creates `MaiDGBridge.ini` only when it is missing;
+- preserves an existing INI file during upgrades;
+- backs up replaced files under `Package/MaiDGBridge.backups/<timestamp>`;
+- never replaces an older DLL while that game instance is running.
+
+Automatic detection only checks running processes named `Sinmai.exe`; it doesn't scan whole drives. DGHub and the game can subsequently be started in either order because the plugin reconnects automatically.
+
+For manual fallback, extract `payload/MaiDGBridge.dll` and `payload/MaiDGBridge.ini` from the plugin ZIP, then copy them to `Package/Mods` and `Package` respectively.
 
 Only 1P MISS triggers are enabled by default. GOOD, GREAT, PERFECT, CRITICAL, 2P, same-frame strength stacking, and result triggers can be enabled independently in the DGHub plugin configuration.
 
@@ -98,7 +102,7 @@ If the port is already in use, change both `MaiDGBridge.ini` and the DGHub plugi
 
 ## Uninstallation
 
-Remove `Package/Mods/MaiDGBridge.dll` and `Package/MaiDGBridge.ini`, then remove the `maimai_link` plugin from DGHub. The project doesn't modify the game's original assemblies or AquaMai configuration.
+First remove or disable the `maimai_link` plugin in DGHub so it cannot reinstall the bridge. Then remove `Package/Mods/MaiDGBridge.dll`, `Package/MaiDGBridge.ini`, and `Package/MaiDGBridge.dghub.json`. Backups under `Package/MaiDGBridge.backups` may be retained or removed separately. The project doesn't modify the game's original assemblies or AquaMai configuration.
 
 ## Building
 
@@ -108,7 +112,7 @@ Run in Windows PowerShell:
 .\build.ps1 -GamePackage "D:\Games\maimai\Package"
 ```
 
-The build script uses the system .NET Framework C# compiler and references MelonLoader, Harmony, and `Assembly-CSharp.dll` from the supplied game package. These third-party and game files are not included in this repository.
+The build script uses the system .NET Framework C# compiler and references MelonLoader, Harmony, and `Assembly-CSharp.dll` from the supplied game package. It produces a self-contained DGHub ZIP with the bridge under `payload/`; third-party and game assemblies are not included.
 
 ## Tests
 
@@ -116,6 +120,8 @@ The repository includes:
 
 - a loopback HTTP/SSE bridge harness;
 - a DGHub WebSocket and SSE integration test;
+- an automatic installer test covering detection, idempotence, running-game deferral, backup, and upgrade;
+- a distributable ZIP structure, size, metadata, and payload hash test;
 - compile-time hook checks that can be run against locally owned package versions.
 
 ## License

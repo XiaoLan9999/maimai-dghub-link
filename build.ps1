@@ -9,7 +9,9 @@ $csc = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"
 $assemblyCSharp = Join-Path $GamePackage "Sinmai_Data\Managed\Assembly-CSharp.dll"
 $melonLoader = Join-Path $GamePackage "MelonLoader\net35\MelonLoader.dll"
 $harmony = Join-Path $GamePackage "MelonLoader\net35\0Harmony.dll"
-$version = "1.1.0"
+$manifestPath = Join-Path $root "plugin\manifest.json"
+$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$version = [string]$manifest.version
 $dist = [IO.Path]::GetFullPath((Join-Path $root "dist"))
 $gameMod = Join-Path $dist "game-mod"
 $pluginStage = Join-Path $dist "plugin-stage"
@@ -42,7 +44,25 @@ if ($LASTEXITCODE -ne 0) {
 
 Copy-Item -LiteralPath (Join-Path $root "bridge\MaiDGBridge.ini") -Destination $gameMod
 Copy-Item -LiteralPath (Join-Path $root "plugin\main.py") -Destination $pluginStage
-Copy-Item -LiteralPath (Join-Path $root "plugin\manifest.json") -Destination $pluginStage
+Copy-Item -LiteralPath (Join-Path $root "plugin\installer.py") -Destination $pluginStage
+Copy-Item -LiteralPath (Join-Path $root "plugin\SOURCE.md") -Destination $pluginStage
+Copy-Item -LiteralPath $manifestPath -Destination $pluginStage
+Copy-Item -LiteralPath (Join-Path $root "LICENSE") -Destination $pluginStage
+
+$payloadStage = Join-Path $pluginStage "payload"
+New-Item -ItemType Directory -Force -Path $payloadStage | Out-Null
+Copy-Item -LiteralPath $bridgeDll -Destination $payloadStage
+Copy-Item -LiteralPath (Join-Path $root "bridge\MaiDGBridge.ini") -Destination $payloadStage
+
+$bridgeHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $bridgeDll).Hash.ToLowerInvariant()
+$descriptor = [ordered]@{
+    plugin_version = $version
+    bridge_version = $version
+    sha256 = $bridgeHash
+}
+$descriptorJson = $descriptor | ConvertTo-Json
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllText((Join-Path $payloadStage "bridge.json"), $descriptorJson + "`n", $utf8NoBom)
 
 $pluginZip = Join-Path $dist "maimai_link-$version.zip"
 Compress-Archive -Path (Join-Path $pluginStage "*") -DestinationPath $pluginZip
