@@ -12,13 +12,14 @@ Sinmai / MelonLoader
   -> http://127.0.0.1:8891/events（本机 SSE）
   -> maimai_link DGHub 插件
   -> DGHub trigger
+  -> 可选：VRChat OSC UDP /chatbox/input
 ```
 
 桥接模块使用 Harmony 挂接游戏自己的 `JudgeResultSt.UpdateScore` 判定入口，并用 `Manager.GameScoreList` 补充 DX 分数与达成率。不解析私服请求、模拟器网络包或触摸输入，因此不受大多数 AquaMai 配置和包体网络魔改影响。
 
 ## 安装
 
-1. 在 DGHub 中导入 `maimai_link-1.2.0.zip`，然后启用插件。
+1. 在 DGHub 中导入 `maimai_link-1.3.0.zip`，然后启用插件。
 2. 如果游戏正在运行，插件会自动识别它的 `Package` 目录并安装内置桥接。安装完成后重启一次游戏，让 MelonLoader 加载桥接。
 3. 如果游戏尚未运行或没有自动识别，在插件配置的“游戏 Package 目录”中选择包含 `Sinmai.exe` 的目录，插件会立即安装。
 
@@ -50,6 +51,30 @@ PublishIntervalMs=250
 - 如果修改 `Port`，同时修改 DGHub 插件的端点。
 - `PublishIntervalMs` 允许范围为 50–5000 毫秒。
 
+## VRChat OSC
+
+插件可以把“正在游玩”和曲目结算卡片发送到 VRChat Chatbox。使用标准
+OSC `/chatbox/input` 的 UDP 消息，不需要在 VRChat 电脑上另运行中转程序。
+
+1. 在 DGHub 插件配置中启用“VRChat OSC”。
+2. 将“VRChat 电脑 IPv4”填写为运行 VRChat 的电脑局域网地址，例如
+   `10.0.0.168`。只有两者在同一台电脑时才填写 `127.0.0.1`。
+3. 端口保持 `9000`，除非 VRChat 启动参数使用了自定义 OSC 端口。
+4. 在 VRChat 动作菜单中打开 `OSC > Enabled`。
+
+发送端会限制为最多 144 个字符、9 行，合并重复内容，并按配置间隔节流
+（默认 1 秒）。曲目结束时会立即发送一次结算卡片；空闲时不会发送空文本，
+因此不会清除其他 OSC 程序正在使用的 Chatbox。VRChat 电脑需要允许专用网络
+配置文件的入站 UDP 9000。OSC 使用无确认的 UDP，请使用稳定的局域网 IPv4，
+或给 VRChat 电脑做 DHCP 地址预约。
+
+## 仅 VRChat 版本
+
+不使用郊狼设备的用户可以安装独立的剥离版插件：
+[maimai-vrchat-osc](https://github.com/XiaoLan9999/maimai-vrchat-osc)。它保留同一
+桥接和正在游玩 OSC 输出，但移除所有设备触发、波形、强度和通道配置。两个版本
+请二选一，不要同时运行。
+
 ## 数据格式
 
 实时判定：
@@ -63,6 +88,10 @@ PublishIntervalMs=250
 ```json
 {"event":"settle","status":"RESULT","player":1,"track":1,"critical":100,"perfect":2,"great":1,"good":0,"miss":1,"combo":40,"dx_score":300,"achievement":99.1234}
 ```
+
+如果包体提供了曲目会话，实时和结算事件还会包含曲名、Artist、谱面类型、显示
+等级、谱面定数以及 0 到 1 的进度。这些字段都是可选的；旧包体或魔改包体读取
+失败时会回退到曲目编号和判定计数，不影响基础联动。
 
 ## 兼容性
 
@@ -80,6 +109,7 @@ PublishIntervalMs=250
 - `NoteJudge.ConvertJudge(NoteJudge.ETiming)`
 - `GameManager.MusicTrackNumber`
 - `GamePlayManager.GetGameScore(int, int)`（补充数据）
+- `NotesManager.GetSessionInfo()` 与 `DataManager.GetMusic(int)`（可选曲目元数据）
 
 目标 1.55 包体已确认能够实时读取 MISS 等判定、触发 DGHub，并在持续时间结束后恢复设备基线。1.50 与 1.60 已完成编译兼容检查，尚未进行游戏内运行验证。
 
@@ -116,7 +146,7 @@ curl.exe -N http://127.0.0.1:8891/events
 
 ## 测试
 
-仓库包含 SSE/WebSocket 端到端测试、自动安装器的识别/备份/升级测试、发布 ZIP 的结构与哈希检查，以及针对多个包体版本的判定钩子编译检查。
+仓库包含 SSE/WebSocket 端到端测试、VRChat OSC 编码/限制/目标校验/UDP 测试、自动安装器的识别/备份/升级测试、发布 ZIP 的结构与哈希检查，以及针对多个包体版本的判定钩子编译检查。
 
 ## 许可证
 
