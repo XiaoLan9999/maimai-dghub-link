@@ -103,13 +103,13 @@ VRChat's receiving computer must allow inbound UDP 9000 on its Private
 network profile. OSC is UDP without acknowledgements; use a stable LAN IPv4
 or a DHCP reservation for reliable delivery.
 
-## VRChat-only variant
+## Standalone VRChat OSC application
 
-Users who do not use DG-LAB can install the stripped companion plugin from
-[maimai-vrchat-osc](https://github.com/XiaoLan9999/maimai-vrchat-osc). It keeps
-the same bridge and now-playing OSC output but removes all device triggers,
-waveform, strength, and channel settings. Choose one package; do not run both
-variants at the same time.
+[maimai-vrchat-osc](https://github.com/XiaoLan9999/maimai-vrchat-osc) is now a
+standalone Windows application and no longer depends on the DGHub plugin
+runtime. It can run alongside this plugin because both are read-only SSE
+clients of the same bridge. When using the standalone application, disable
+VRChat OSC in this DGHub plugin so only one process publishes Chatbox messages.
 
 ## Event format
 
