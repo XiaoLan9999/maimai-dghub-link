@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import math
 import os
 import socket
 import sys
@@ -9,6 +10,7 @@ import threading
 import urllib.request
 
 from installer import ensure_bridge_installed
+from vrchat_osc import OscChatboxPublisher, format_playing, format_result
 
 try:
     import websockets
@@ -44,6 +46,15 @@ DEFAULT_CONFIG = {
     "settle_strength": 25,
     "settle_duration": 2.0,
     "settle_preset": "CS2-\u53d7\u4f24",
+    "osc_enabled": False,
+    "osc_host": "127.0.0.1",
+    "osc_port": "9000",
+    "osc_player": "1",
+    "osc_update_interval": 1.0,
+    "osc_show_artist": True,
+    "osc_show_judgements": True,
+    "osc_show_result": True,
+    "osc_notification": False,
 }
 
 
@@ -52,6 +63,14 @@ def as_int(value, default=0):
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def as_float(value, default=0.0):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
 
 
 class SseClient:
@@ -183,6 +202,7 @@ async def main():
     loop = asyncio.get_running_loop()
     event_queue = asyncio.Queue()
     source = SseClient(loop, event_queue)
+    osc = OscChatboxPublisher()
     last_counts = {1: None, 2: None}
     install_wakeup = asyncio.Event()
     install_state = {
@@ -202,8 +222,14 @@ async def main():
         "detail": "等待 MaiDGBridge 数据流",
         "hint": "安装桥接后启动游戏；插件会自动重连",
     }
+    osc_state = {
+        "state": "pending",
+        "detail": "VRChat OSC 未启用",
+        "hint": "启用后填写运行 VRChat 的电脑局域网 IPv4",
+    }
     restart_notice = [False]
     last_status = [None]
+    last_osc_error = [None]
 
     async def report(ws):
         bridge_state = dict(install_state)
@@ -257,6 +283,13 @@ async def main():
                         "detail": stream_state["detail"],
                         "hint": stream_state["hint"],
                     },
+                    {
+                        "key": "vrchat_osc",
+                        "title": "VRChat OSC",
+                        "state": osc_state["state"],
+                        "detail": osc_state["detail"],
+                        "hint": osc_state["hint"],
+                    },
                 ],
             },
         }
@@ -275,6 +308,61 @@ async def main():
             "level": level,
             "message": message,
         }, ensure_ascii=False))
+
+    def configure_osc():
+        try:
+            player = as_int(cfg["osc_player"], 1)
+            if player not in (1, 2):
+                raise ValueError("OSC player must be 1 or 2")
+            osc.configure(
+                cfg["osc_enabled"],
+                cfg["osc_host"],
+                cfg["osc_port"],
+                cfg["osc_update_interval"],
+                cfg["osc_notification"],
+            )
+        except (TypeError, ValueError) as exc:
+            osc.enabled = False
+            osc_state.update({
+                "state": "fail",
+                "detail": "OSC 配置无效：" + str(exc),
+                "hint": "目标应为局域网 IPv4，端口通常为 9000",
+            })
+            return
+
+        last_osc_error[0] = None
+        if osc.enabled:
+            osc_state.update({
+                "state": "ok",
+                "detail": "将发送到 {0}:{1}（UDP）".format(osc.host, osc.port),
+                "hint": "VRChat 中需启用 OSC；UDP 无连接握手",
+            })
+        else:
+            osc_state.update({
+                "state": "pending",
+                "detail": "VRChat OSC 未启用",
+                "hint": "启用后填写运行 VRChat 的电脑局域网 IPv4",
+            })
+
+    async def publish_osc(ws, text, force=False):
+        try:
+            sent = osc.publish(text, force=force)
+        except OSError as exc:
+            error = str(exc)
+            osc_state.update({
+                "state": "fail",
+                "detail": "OSC 发送失败：" + error,
+                "hint": "检查目标 IPv4、网络连接和 VRChat 机防火墙",
+            })
+            if error != last_osc_error[0]:
+                last_osc_error[0] = error
+                await log(ws, "error", "VRChat OSC 发送失败：" + error)
+                await report(ws)
+            return False
+        if sent and last_osc_error[0] is not None:
+            configure_osc()
+            await report(ws)
+        return sent
 
     async def installer_loop(ws):
         nonlocal install_state
@@ -360,10 +448,23 @@ async def main():
 
     async def on_counts(ws, event):
         player = as_int(event.get("player"), 1)
-        if player not in (1, 2) or not player_enabled(player):
+        if player not in (1, 2):
             return
         if event.get("status") != "PLAYING":
             last_counts[player] = None
+            return
+
+        if osc.enabled and player == as_int(cfg["osc_player"], 1):
+            await publish_osc(
+                ws,
+                format_playing(
+                    event,
+                    show_artist=bool(cfg["osc_show_artist"]),
+                    show_judgements=bool(cfg["osc_show_judgements"]),
+                ),
+            )
+
+        if not player_enabled(player):
             return
 
         previous = last_counts[player]
@@ -404,8 +505,25 @@ async def main():
 
     async def on_settle(ws, event):
         player = as_int(event.get("player"), 1)
+        if player not in (1, 2):
+            return
         last_counts[player] = None
-        if player not in (1, 2) or not player_enabled(player):
+        if (
+            osc.enabled
+            and player == as_int(cfg["osc_player"], 1)
+            and bool(cfg["osc_show_result"])
+        ):
+            await publish_osc(
+                ws,
+                format_result(
+                    event,
+                    show_artist=bool(cfg["osc_show_artist"]),
+                    show_judgements=bool(cfg["osc_show_judgements"]),
+                ),
+                force=True,
+            )
+
+        if not player_enabled(player):
             return
         miss = as_int(event.get("miss"))
         if not cfg["settle_enabled"]:
@@ -414,7 +532,7 @@ async def main():
             return
         label = "P{0} RESULT {1:.4f}% M{2} T{3}".format(
             player,
-            float(event.get("achievement", 0.0)),
+            as_float(event.get("achievement")),
             miss,
             as_int(event.get("track")),
         )
@@ -488,8 +606,10 @@ async def main():
                     for key in cfg:
                         if key in data:
                             cfg[key] = data[key]
+                    configure_osc()
                     source.start(str(cfg["endpoint"]))
                     install_wakeup.set()
+                    await report(ws)
                 elif operation == "config_changed":
                     key = message.get("key")
                     if key in cfg:
@@ -505,10 +625,14 @@ async def main():
                         elif key in ("p1_enabled", "p2_enabled"):
                             last_counts[1] = None
                             last_counts[2] = None
+                        elif key.startswith("osc_"):
+                            configure_osc()
+                            await report(ws)
                 elif operation == "ping":
                     await ws.send(json.dumps({"op": "pong", "t": message.get("t")}))
         finally:
             source.stop()
+            osc.close()
             processor.cancel()
             installer.cancel()
             try:
