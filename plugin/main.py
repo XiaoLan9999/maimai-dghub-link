@@ -217,6 +217,7 @@ async def main():
         "kind": "MENU",
     }
     result_hold_until = [0.0]
+    result_screen_active = [False]
     last_osc_send_at = [0.0]
     osc_sent_once = [False]
     last_counts = {1: None, 2: None}
@@ -497,6 +498,8 @@ async def main():
             last_counts[player] = None
             return
 
+        result_screen_active[0] = False
+
         if osc.enabled and player == as_int(cfg["osc_player"], 1):
             await set_osc_card(
                 ws,
@@ -552,6 +555,7 @@ async def main():
         if player not in (1, 2):
             return
         last_counts[player] = None
+        result_screen_active[0] = False
         if (
             osc.enabled
             and player == as_int(cfg["osc_player"], 1)
@@ -618,8 +622,14 @@ async def main():
                 await on_settle(ws, event)
             elif event.get("event") == "presence":
                 status = str(event.get("status") or "MENU").upper()
+                if status == "RESULT_SCREEN":
+                    result_screen_active[0] = True
+                    continue
+                was_result_screen = result_screen_active[0]
+                result_screen_active[0] = False
                 if not (
                     status == "MENU"
+                    and not was_result_screen
                     and time.monotonic() < result_hold_until[0]
                 ):
                     await set_osc_card(

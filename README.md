@@ -19,7 +19,7 @@ The bridge uses Harmony to hook the game's own `JudgeResultSt.UpdateScore` entry
 
 ## Installation
 
-1. Import `maimai_link-1.4.0.zip` in DGHub and enable the plugin.
+1. Import `maimai_link-1.4.1.zip` in DGHub and enable the plugin.
 2. If the game is already running, the plugin detects its `Package` directory and installs the bundled bridge automatically. Restart the game once so MelonLoader can load it.
 3. If the game isn't running or automatic detection doesn't find it, open the plugin configuration and select the directory that contains `Sinmai.exe` under **Game Package directory**. Installation starts immediately.
 

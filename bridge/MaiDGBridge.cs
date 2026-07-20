@@ -12,7 +12,7 @@ using HarmonyLib;
 using Manager;
 using MelonLoader;
 
-[assembly: MelonInfo(typeof(MaiDGBridge.BridgeMod), "MaiDGBridge", "1.4.0", "XiaoLan9999", "")]
+[assembly: MelonInfo(typeof(MaiDGBridge.BridgeMod), "MaiDGBridge", "1.4.1", "XiaoLan9999", "")]
 [assembly: MelonGame("sega-interactive", "Sinmai")]
 
 namespace MaiDGBridge
@@ -24,6 +24,7 @@ namespace MaiDGBridge
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private static BridgeMod _active;
         private static object _musicSelectProcess;
+        private static object _resultProcess;
         private SseServer _server;
         private PresenceSnapshot _lastPresence;
         private bool _wasInGame;
@@ -54,6 +55,7 @@ namespace MaiDGBridge
                 _server.Start();
                 PatchJudgeResults();
                 PatchMusicSelect();
+                PatchResultProcess();
                 MelonLogger.Msg("MaiDGBridge listening on http://127.0.0.1:" + config.Port + "/events");
             }
             catch (Exception ex)
@@ -162,6 +164,8 @@ namespace MaiDGBridge
             {
                 _active = null;
             }
+            _musicSelectProcess = null;
+            _resultProcess = null;
             SseServer server = _server;
             _server = null;
             if (server != null)
@@ -226,10 +230,53 @@ namespace MaiDGBridge
             }
         }
 
+        private void PatchResultProcess()
+        {
+            System.Type type = AccessTools.TypeByName("Process.ResultProcess");
+            if (type == null)
+            {
+                MelonLogger.Warning("MaiDGBridge result process type was not found");
+                return;
+            }
+
+            MethodInfo onStart = AccessTools.Method(type, "OnStart");
+            MethodInfo onRelease = AccessTools.Method(type, "OnRelease");
+            MethodInfo startPostfix = AccessTools.Method(typeof(BridgeMod), "ResultStartPostfix");
+            MethodInfo releasePostfix = AccessTools.Method(typeof(BridgeMod), "ResultReleasePostfix");
+            if (onStart == null || onRelease == null || startPostfix == null || releasePostfix == null)
+            {
+                MelonLogger.Warning("MaiDGBridge result process hooks were not found");
+                return;
+            }
+
+            HarmonyLib.Harmony harmony = new HarmonyLib.Harmony("MaiDGBridge.ResultPresenceHook");
+            harmony.Patch(onStart, null, new HarmonyMethod(startPostfix));
+            harmony.Patch(onRelease, null, new HarmonyMethod(releasePostfix));
+            MelonLogger.Msg("MaiDGBridge result presence hook installed");
+        }
+
+        private static void ResultStartPostfix(object __instance)
+        {
+            _resultProcess = __instance;
+        }
+
+        private static void ResultReleasePostfix(object __instance)
+        {
+            if (ReferenceEquals(_resultProcess, __instance))
+            {
+                _resultProcess = null;
+            }
+        }
+
         private PresenceSnapshot CapturePresence()
         {
             PresenceSnapshot presence = new PresenceSnapshot();
             presence.Version = ReadVersion();
+            if (_resultProcess != null)
+            {
+                presence.Status = "RESULT_SCREEN";
+                return presence;
+            }
             object process = _musicSelectProcess;
             if (process == null)
             {
@@ -316,7 +363,12 @@ namespace MaiDGBridge
             try
             {
                 System.Type configType = AccessTools.TypeByName("MAI2System.SystemConfig");
-                object config = ReadStaticMember(configType, "config");
+                object systemConfig = ReadStaticMember(configType, "Instance");
+                object config = ReadMember(systemConfig, "config");
+                if (config == null)
+                {
+                    config = ReadStaticMember(configType, "config");
+                }
                 string display = ToText(ReadMember(config, "displayVersionString"));
                 if (!string.IsNullOrEmpty(display))
                 {
@@ -324,6 +376,15 @@ namespace MaiDGBridge
                 }
                 object rom = ReadMember(config, "romVersionInfo");
                 object versionNo = ReadMember(rom, "versionNo");
+                string version = ToText(ReadMember(versionNo, "versionString"));
+                if (!string.IsNullOrEmpty(version))
+                {
+                    return version;
+                }
+
+                System.Type amManagerType = AccessTools.TypeByName("Manager.AmManager");
+                object amManager = ReadStaticMember(amManagerType, "Instance");
+                versionNo = ReadMember(amManager, "VersionNo");
                 return ToText(ReadMember(versionNo, "versionString"));
             }
             catch

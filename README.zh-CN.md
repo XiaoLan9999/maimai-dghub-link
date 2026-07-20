@@ -19,7 +19,7 @@ Sinmai / MelonLoader
 
 ## 安装
 
-1. 在 DGHub 中导入 `maimai_link-1.4.0.zip`，然后启用插件。
+1. 在 DGHub 中导入 `maimai_link-1.4.1.zip`，然后启用插件。
 2. 如果游戏正在运行，插件会自动识别它的 `Package` 目录并安装内置桥接。安装完成后重启一次游戏，让 MelonLoader 加载桥接。
 3. 如果游戏尚未运行或没有自动识别，在插件配置的“游戏 Package 目录”中选择包含 `Sinmai.exe` 的目录，插件会立即安装。
 

@@ -69,6 +69,9 @@ async def main():
             "critical": 0, "perfect": 0, "great": 0, "good": 3, "miss": 1,
             "achievement": 95.1234,
         })
+        await event({
+            "event": "presence", "status": "RESULT_SCREEN", "version": "1.55.00",
+        })
         source_done.set()
         await asyncio.sleep(7)
         writer.close()

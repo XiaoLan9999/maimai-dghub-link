@@ -1,7 +1,7 @@
 {
   "id": "maimai_link",
   "name": "maimai DX · DGHub 联动",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "sdk": "1",
   "author": "XiaoLan9999",
   "description": "接收本机 maimai DX 实时数据，触发 DGHub，并通过局域网持续显示 VRChat OSC 游戏状态。",

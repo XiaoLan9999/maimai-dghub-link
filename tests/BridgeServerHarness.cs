@@ -121,10 +121,33 @@ public static class NoteJudge
     public static JudgeBox ConvertJudge(ETiming timing) { return JudgeBox.Critical; }
 }
 
+namespace MAI2System
+{
+    public sealed class Config
+    {
+        public string displayVersionString = "Ver.CN1.55-8";
+    }
+
+    public sealed class SystemConfig
+    {
+        public static readonly SystemConfig Instance = new SystemConfig();
+        public readonly Config config = new Config();
+    }
+}
+
 internal static class BridgeServerHarness
 {
     public static int Main()
     {
+        System.Reflection.MethodInfo readVersion = typeof(MaiDGBridge.BridgeMod).GetMethod(
+            "ReadVersion",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        string version = (string)readVersion.Invoke(null, null);
+        if (version != "Ver.CN1.55-8")
+        {
+            throw new Exception("version lookup failed: " + version);
+        }
+
         MaiDGBridge.Snapshot snapshot = new MaiDGBridge.Snapshot
         {
             Player = 1,
