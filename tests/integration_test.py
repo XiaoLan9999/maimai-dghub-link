@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import pathlib
+import socket
 import sys
 
 import websockets
@@ -17,6 +18,10 @@ async def main():
     continue_events = asyncio.Event()
     source_done = asyncio.Event()
     received = []
+    osc_receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    osc_receiver.bind(("127.0.0.1", 0))
+    osc_receiver.setblocking(False)
+    osc_port = osc_receiver.getsockname()[1]
 
     async def sse_handler(reader, writer):
         await reader.readuntil(b"\r\n\r\n")
@@ -77,6 +82,11 @@ async def main():
                 "endpoint": "http://127.0.0.1:{0}/events".format(sse_port),
                 "auto_detect_game": False,
                 "auto_install_bridge": False,
+                "osc_enabled": True,
+                "osc_host": "127.0.0.1",
+                "osc_port": str(osc_port),
+                "osc_player": "1",
+                "osc_update_interval": 0.5,
             },
         }))
 
@@ -88,6 +98,7 @@ async def main():
             await ws.send(json.dumps({
                 "op": "config_changed", "key": "stack_by_count", "value": True,
             }))
+            await asyncio.sleep(0.2)
             continue_events.set()
             await source_done.wait()
             await asyncio.sleep(0.4)
@@ -123,6 +134,15 @@ async def main():
     )
     stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=15)
 
+    osc_packets = []
+    while True:
+        try:
+            packet, _ = osc_receiver.recvfrom(4096)
+            osc_packets.append(packet)
+        except BlockingIOError:
+            break
+    osc_receiver.close()
+
     ws_server.close()
     await ws_server.wait_closed()
     sse_server.close()
@@ -147,7 +167,9 @@ async def main():
         message.get("op") == "pong" and message.get("t") == 12345
         for message in received
     ), received
-    print("integration ok: handshake, CRLF SSE, config changes, triggers, pong, stop")
+    assert any(b",sTF" in packet and b"ACH 0.0000%" in packet for packet in osc_packets), osc_packets
+    assert any(b",sTF" in packet and b"RESULT 95.1234%" in packet for packet in osc_packets), osc_packets
+    print("integration ok: handshake, SSE, triggers, VRChat OSC, pong, stop")
 
 
 if __name__ == "__main__":
