@@ -12,14 +12,13 @@ Sinmai / MelonLoader
   -> http://127.0.0.1:8891/events (loopback SSE)
   -> maimai_link external DGHub plugin
   -> DGHub trigger
-  -> optional VRChat OSC UDP /chatbox/input
 ```
 
 The bridge uses Harmony to hook the game's own `JudgeResultSt.UpdateScore` entry point. `Manager.GameScoreList` is used only to supplement DX score and achievement data. It doesn't parse private-server traffic, simulator network packets, or touch input, so most AquaMai and network modifications don't affect judgement capture.
 
 ## Installation
 
-1. Import `maimai_link-1.4.1.zip` in DGHub and enable the plugin.
+1. Import `maimai_link-1.4.2.zip` in DGHub and enable the plugin.
 2. If the game is already running, the plugin detects its `Package` directory and installs the bundled bridge automatically. Restart the game once so MelonLoader can load it.
 3. If the game isn't running or automatic detection doesn't find it, open the plugin configuration and select the directory that contains `Sinmai.exe` under **Game Package directory**. Installation starts immediately.
 
@@ -65,51 +64,13 @@ PresenceIntervalMs=1000
 - `PresenceIntervalMs` accepts values from 250 to 10000 milliseconds and controls
   menu/ song-select status updates.
 
-## VRChat OSC
-
-The plugin sends a persistent status card to the VRChat Chatbox. It uses
-the standard OSC `/chatbox/input` over UDP; no helper process is needed on
-the VRChat computer.
-
-1. Enable **VRChat OSC** in the DGHub plugin configuration.
-2. Set **VRChat computer IPv4** to the LAN address of the computer running
-   VRChat (for example `10.0.0.168`). Keep `127.0.0.1` only when both
-   applications run on the same computer.
-3. Keep the port at `9000` unless VRChat was started with a custom OSC port.
-4. In VRChat, open the Action Menu and enable **OSC > Enabled**.
-
-The sender limits messages to 144 characters and 9 lines, removes duplicate
-updates, and throttles updates to the configured interval (1 second by
-default). After each state update it re-sends the current card every 5 seconds
-so VRChat can recover after a temporary UDP loss. The bridge emits menu and
-song-select states even when no note is being judged:
-
-```text
-【舞萌DX】
-在主界面中
-版本号 1.55.00
-```
-
-```text
-【舞萌DX】
-42s 正在选歌：
-Song Name MASTER
-```
-
-At track end the result card is held briefly, then the next menu/select state
-takes over. The plugin never sends an empty idle card, so it will not clear or
-overwrite another OSC application's Chatbox.
-VRChat's receiving computer must allow inbound UDP 9000 on its Private
-network profile. OSC is UDP without acknowledgements; use a stable LAN IPv4
-or a DHCP reservation for reliable delivery.
-
-## Standalone VRChat OSC application
+## VRChat integration
 
 [maimai-vrchat-osc](https://github.com/XiaoLan9999/maimai-vrchat-osc) is now a
 standalone Windows application and no longer depends on the DGHub plugin
-runtime. It can run alongside this plugin because both are read-only SSE
-clients of the same bridge. When using the standalone application, disable
-VRChat OSC in this DGHub plugin so only one process publishes Chatbox messages.
+runtime. VRChat OSC is intentionally absent from this DGHub plugin. Install
+and configure the standalone application for Chatbox cards; DGHub only handles
+device triggers and bridge installation.
 
 ## Event format
 
@@ -128,8 +89,8 @@ Track result:
 Menu and song-select presence:
 
 ```json
-{"event":"presence","status":"MENU","version":"1.55.00"}
-{"event":"presence","status":"SELECTING","version":"1.55.00","remaining":42,"timer_infinite":false,"difficulty":"MASTER","title":"Song Name"}
+{"event":"presence","status":"MENU","version":"Ver.CN1.56-B"}
+{"event":"presence","status":"SELECTING","version":"Ver.CN1.56-B","remaining":42,"timer_infinite":false,"difficulty":"MASTER","title":"Song Name"}
 ```
 
 When available, live and result events also include the current song title,
@@ -196,8 +157,6 @@ The repository includes:
 
 - a loopback HTTP/SSE bridge harness;
 - a DGHub WebSocket and SSE integration test;
-- an OSC encoder, Chatbox limit, target validation, throttle, presence formatting,
-  keepalive, and UDP test;
 - an automatic installer test covering detection, idempotence, running-game deferral, backup, and upgrade;
 - a distributable ZIP structure, size, metadata, and payload hash test;
 - compile-time hook checks that can be run against locally owned package versions.

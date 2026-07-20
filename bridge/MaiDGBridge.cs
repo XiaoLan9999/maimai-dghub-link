@@ -12,7 +12,7 @@ using HarmonyLib;
 using Manager;
 using MelonLoader;
 
-[assembly: MelonInfo(typeof(MaiDGBridge.BridgeMod), "MaiDGBridge", "1.4.1", "XiaoLan9999", "")]
+[assembly: MelonInfo(typeof(MaiDGBridge.BridgeMod), "MaiDGBridge", "1.4.2", "XiaoLan9999", "")]
 [assembly: MelonGame("sega-interactive", "Sinmai")]
 
 namespace MaiDGBridge
@@ -30,6 +30,7 @@ namespace MaiDGBridge
         private bool _wasInGame;
         private bool _judgeHookObserved;
         private bool _metadataWarningLogged;
+        private string _cachedVersion = string.Empty;
         private long _lastPeriodicPublish;
         private long _lastPresencePublish;
         private long _lastErrorLog;
@@ -83,6 +84,8 @@ namespace MaiDGBridge
                     {
                         _last[0] = null;
                         _last[1] = null;
+                        _hookCounts[0] = null;
+                        _hookCounts[1] = null;
                         _lastPresence = null;
                         _server.PublishJson("{\"event\":\"state\",\"status\":\"PLAYING\"}");
                     }
@@ -271,7 +274,12 @@ namespace MaiDGBridge
         private PresenceSnapshot CapturePresence()
         {
             PresenceSnapshot presence = new PresenceSnapshot();
-            presence.Version = ReadVersion();
+            string version = ReadVersion();
+            if (!string.IsNullOrEmpty(version))
+            {
+                _cachedVersion = version;
+            }
+            presence.Version = _cachedVersion;
             if (_resultProcess != null)
             {
                 presence.Status = "RESULT_SCREEN";
@@ -370,13 +378,23 @@ namespace MaiDGBridge
                     config = ReadStaticMember(configType, "config");
                 }
                 string display = ToText(ReadMember(config, "displayVersionString"));
+                if (string.IsNullOrEmpty(display))
+                {
+                    display = ToText(ReadMember(config, "_displayVersionString"));
+                }
                 if (!string.IsNullOrEmpty(display))
                 {
                     return display;
                 }
-                object rom = ReadMember(config, "romVersionInfo");
-                object versionNo = ReadMember(rom, "versionNo");
+                object rom = ReadMember(config, "romVersionInfo") ??
+                             ReadMember(config, "_romVersionInfo");
+                object versionNo = ReadMember(rom, "versionNo") ??
+                                   ReadMember(rom, "_versionNo");
                 string version = ToText(ReadMember(versionNo, "versionString"));
+                if (string.IsNullOrEmpty(version))
+                {
+                    version = ToText(ReadMember(versionNo, "_versionString"));
+                }
                 if (!string.IsNullOrEmpty(version))
                 {
                     return version;
@@ -410,7 +428,8 @@ namespace MaiDGBridge
             NoteScore.EScoreType type,
             NoteJudge.ETiming timing)
         {
-            if (_server == null || !_server.IsRunning || monitorIndex < 0 || monitorIndex >= 2)
+            if (_server == null || !_server.IsRunning || !GameManager.IsInGame ||
+                monitorIndex < 0 || monitorIndex >= 2)
             {
                 return;
             }

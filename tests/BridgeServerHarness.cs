@@ -125,7 +125,7 @@ namespace MAI2System
 {
     public sealed class Config
     {
-        public string displayVersionString = "Ver.CN1.55-8";
+        public string displayVersionString = "Ver.CN1.56-B";
     }
 
     public sealed class SystemConfig
@@ -143,7 +143,7 @@ internal static class BridgeServerHarness
             "ReadVersion",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
         string version = (string)readVersion.Invoke(null, null);
-        if (version != "Ver.CN1.55-8")
+        if (version != "Ver.CN1.56-B")
         {
             throw new Exception("version lookup failed: " + version);
         }

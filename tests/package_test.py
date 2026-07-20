@@ -9,7 +9,6 @@ REQUIRED = {
     "manifest.json",
     "main.py",
     "installer.py",
-    "vrchat_osc.py",
     "SOURCE.md",
     "LICENSE",
     "payload/bridge.json",
@@ -49,9 +48,7 @@ def main():
         for section in manifest["config_schema"]
         for field in section["fields"]
     }
-    osc_fields = {key: field for key, field in all_fields.items() if key.startswith("osc_")}
-    assert osc_fields["osc_enabled"]["default"] is False, osc_fields
-    assert osc_fields["osc_port"]["default"] == "9000", osc_fields
+    assert not any(key.startswith("osc_") for key in all_fields), all_fields
     if expected_id == "maimai_vrchat_osc":
         assert "settle_enabled" not in all_fields, all_fields
         assert "miss_strength" not in all_fields, all_fields

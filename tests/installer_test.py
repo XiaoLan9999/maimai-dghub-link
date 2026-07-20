@@ -54,6 +54,14 @@ def main():
         assert second["state"] == "ok", second
         assert not second["backup"], second
 
+        write_payload(plugin, "1.2.0", b"equivalent bridge build")
+        equivalent = ensure_bridge_installed(
+            str(plugin), str(package), auto_detect=False, running_packages=[]
+        )
+        assert equivalent["state"] == "ok", equivalent
+        assert not equivalent["backup"], equivalent
+        assert (package / "Mods" / "MaiDGBridge.dll").read_bytes() == b"bridge version 1"
+
         write_payload(plugin, "1.2.1", b"bridge version 2")
         deferred = ensure_bridge_installed(
             str(plugin),
@@ -80,7 +88,7 @@ def main():
         )
         assert invalid["state"] == "fail", invalid
 
-    print("installer ok: detect, install, idempotence, running-game deferral, backup, upgrade")
+    print("installer ok: detect, install, idempotence, compatible bridge, running-game deferral, backup, upgrade")
 
 
 if __name__ == "__main__":

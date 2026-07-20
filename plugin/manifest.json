@@ -1,10 +1,10 @@
 {
   "id": "maimai_link",
   "name": "maimai DX · DGHub 联动",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "sdk": "1",
   "author": "XiaoLan9999",
-  "description": "接收本机 maimai DX 实时数据，触发 DGHub，并通过局域网持续显示 VRChat OSC 游戏状态。",
+  "description": "接收本机 maimai DX 实时数据并触发 DGHub 郊狼效果。VRChat OSC 由独立软件 maimai-vrchat-osc 负责。",
   "homepage": "https://github.com/XiaoLan9999/maimai-dghub-link",
   "entry": "main.py",
   "capabilities": { "startup_check": true },
@@ -53,55 +53,6 @@
       "fields": [
         { "key": "p1_enabled", "type": "bool", "label": "接收 1P 判定", "default": true },
         { "key": "p2_enabled", "type": "bool", "label": "接收 2P 判定", "default": false }
-      ]
-    },
-    {
-      "section": "VRChat OSC",
-      "fields": [
-        {
-          "key": "osc_enabled",
-          "type": "bool",
-          "label": "启用 VRChat Chatbox",
-          "default": false,
-          "description": "通过标准 OSC UDP 持续发送主界面、选歌、正在游玩与结算信息；VRChat 中也需要启用 OSC"
-        },
-        {
-          "key": "osc_host",
-          "type": "text",
-          "label": "VRChat 电脑 IPv4",
-          "default": "127.0.0.1",
-          "description": "同机使用 127.0.0.1；局域网另一台电脑填写其 IPv4，例如 10.0.0.168"
-        },
-        {
-          "key": "osc_port",
-          "type": "text",
-          "label": "VRChat OSC 端口",
-          "default": "9000",
-          "description": "VRChat 默认接收端口为 UDP 9000"
-        },
-        {
-          "key": "osc_player",
-          "type": "text",
-          "label": "显示玩家",
-          "default": "1",
-          "description": "填写 1 或 2；该选项独立于 DGHub 判定触发玩家开关"
-        },
-        {
-          "key": "osc_update_interval",
-          "type": "duration",
-          "label": "刷新间隔",
-          "default": 1.0,
-          "description": "限制为 0.5 至 30 秒；仅在内容变化或保活时发送"
-        },
-        { "key": "osc_show_artist", "type": "bool", "label": "显示 Artist", "default": true },
-        { "key": "osc_show_judgements", "type": "bool", "label": "显示连击与 MISS", "default": true },
-        { "key": "osc_show_result", "type": "bool", "label": "显示曲目结算", "default": true },
-        {
-          "key": "osc_notification",
-          "type": "bool",
-          "label": "播放 Chatbox 通知音",
-          "default": false
-        }
       ]
     },
     {

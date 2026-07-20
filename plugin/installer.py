@@ -229,6 +229,22 @@ def _write_marker(package, descriptor, dll_hash, backup):
             os.unlink(temporary)
 
 
+def _compatible_installed_build(package, descriptor, destination_hash):
+    marker_path = os.path.join(package, MARKER_NAME)
+    if not destination_hash or not os.path.isfile(marker_path):
+        return False
+    try:
+        with open(marker_path, encoding="utf-8-sig") as source:
+            marker = json.load(source)
+    except (OSError, ValueError, TypeError):
+        return False
+    return (
+        str(marker.get("bridge_version", ""))
+        == str(descriptor.get("bridge_version", ""))
+        and str(marker.get("dll_sha256", "")).lower() == destination_hash
+    )
+
+
 def ensure_bridge_installed(
     plugin_root,
     configured_path="",
@@ -295,7 +311,9 @@ def ensure_bridge_installed(
     ini_destination = os.path.join(package, INI_NAME)
     destination_hash = _sha256(dll_destination) if os.path.isfile(dll_destination) else ""
 
-    if destination_hash == payload_hash:
+    if destination_hash == payload_hash or _compatible_installed_build(
+        package, descriptor, destination_hash
+    ):
         if not os.path.isfile(ini_destination) and auto_install:
             try:
                 _atomic_copy(payload_ini, ini_destination)
