@@ -69,6 +69,7 @@ $pluginZip = Join-Path $dist "maimai_link-$version.zip"
 Compress-Archive -Path (Join-Path $pluginStage "*") -DestinationPath $pluginZip
 Remove-Item -LiteralPath $pluginStage -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination $dist
+Copy-Item -LiteralPath (Join-Path $root "README.zh-CN.md") -Destination $dist
 
 Write-Output "Built: $pluginZip"
 Write-Output "Built: $gameMod"
