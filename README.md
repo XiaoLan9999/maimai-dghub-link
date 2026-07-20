@@ -19,7 +19,7 @@ The bridge uses Harmony to hook the game's own `JudgeResultSt.UpdateScore` entry
 
 ## Installation
 
-1. Import `maimai_link-1.3.0.zip` in DGHub and enable the plugin.
+1. Import `maimai_link-1.4.0.zip` in DGHub and enable the plugin.
 2. If the game is already running, the plugin detects its `Package` directory and installs the bundled bridge automatically. Restart the game once so MelonLoader can load it.
 3. If the game isn't running or automatic detection doesn't find it, open the plugin configuration and select the directory that contains `Sinmai.exe` under **Game Package directory**. Installation starts immediately.
 
@@ -45,15 +45,18 @@ Only 1P MISS triggers are enabled by default. GOOD, GREAT, PERFECT, CRITICAL, 2P
 Enabled=true
 Port=8891
 PublishIntervalMs=250
+PresenceIntervalMs=1000
 ```
 
 - The server listens only on `127.0.0.1`; it isn't exposed to the LAN.
 - If you change `Port`, update the DGHub plugin endpoint as well.
 - `PublishIntervalMs` accepts values from 50 to 5000 milliseconds.
+- `PresenceIntervalMs` accepts values from 250 to 10000 milliseconds and controls
+  menu/ song-select status updates.
 
 ## VRChat OSC
 
-The plugin can send a compact now-playing card to the VRChat Chatbox. It uses
+The plugin sends a persistent status card to the VRChat Chatbox. It uses
 the standard OSC `/chatbox/input` over UDP; no helper process is needed on
 the VRChat computer.
 
@@ -66,8 +69,25 @@ the VRChat computer.
 
 The sender limits messages to 144 characters and 9 lines, removes duplicate
 updates, and throttles updates to the configured interval (1 second by
-default). It sends the result card once at the end of a track and does not
-clear the Chatbox on idle, so it will not overwrite another OSC application.
+default). After each state update it re-sends the current card every 5 seconds
+so VRChat can recover after a temporary UDP loss. The bridge emits menu and
+song-select states even when no note is being judged:
+
+```text
+【舞萌DX】
+在主界面中
+版本号 1.55.00
+```
+
+```text
+【舞萌DX】
+42s 正在选歌：
+Song Name MASTER
+```
+
+At track end the result card is held briefly, then the next menu/select state
+takes over. The plugin never sends an empty idle card, so it will not clear or
+overwrite another OSC application's Chatbox.
 VRChat's receiving computer must allow inbound UDP 9000 on its Private
 network profile. OSC is UDP without acknowledgements; use a stable LAN IPv4
 or a DHCP reservation for reliable delivery.
@@ -94,6 +114,13 @@ Track result:
 {"event":"settle","status":"RESULT","player":1,"track":1,"critical":100,"perfect":2,"great":1,"good":0,"miss":1,"combo":40,"dx_score":300,"achievement":99.1234}
 ```
 
+Menu and song-select presence:
+
+```json
+{"event":"presence","status":"MENU","version":"1.55.00"}
+{"event":"presence","status":"SELECTING","version":"1.55.00","remaining":42,"timer_infinite":false,"difficulty":"MASTER","title":"Song Name"}
+```
+
 When available, live and result events also include the current song title,
 artist, chart name, display level, chart constant, and progress from 0 to 1.
 These fields are optional so older or heavily modified packages can fall back
@@ -116,6 +143,7 @@ All three versions retain these key interfaces:
 - `GameManager.MusicTrackNumber`
 - `GamePlayManager.GetGameScore(int, int)` for supplemental data
 - `NotesManager.GetSessionInfo()` and `DataManager.GetMusic(int)` for optional song metadata
+- `Process.MusicSelectProcess` and `MAI2System.SystemConfig` for menu/select status
 
 On the target 1.55 package, live MISS capture, DGHub triggering, device output, and rollback to baseline have been verified. Versions 1.50 and 1.60 have compile-time compatibility coverage but haven't yet been runtime tested.
 
@@ -156,7 +184,8 @@ The repository includes:
 
 - a loopback HTTP/SSE bridge harness;
 - a DGHub WebSocket and SSE integration test;
-- an OSC encoder, Chatbox limit, target validation, throttle, and UDP test;
+- an OSC encoder, Chatbox limit, target validation, throttle, presence formatting,
+  keepalive, and UDP test;
 - an automatic installer test covering detection, idempotence, running-game deferral, backup, and upgrade;
 - a distributable ZIP structure, size, metadata, and payload hash test;
 - compile-time hook checks that can be run against locally owned package versions.

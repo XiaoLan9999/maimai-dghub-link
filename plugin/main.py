@@ -7,10 +7,16 @@ import os
 import socket
 import sys
 import threading
+import time
 import urllib.request
 
 from installer import ensure_bridge_installed
-from vrchat_osc import OscChatboxPublisher, format_playing, format_result
+from vrchat_osc import (
+    OscChatboxPublisher,
+    format_playing,
+    format_presence,
+    format_result,
+)
 
 try:
     import websockets
@@ -56,6 +62,9 @@ DEFAULT_CONFIG = {
     "osc_show_result": True,
     "osc_notification": False,
 }
+
+OSC_KEEPALIVE_SECONDS = 5.0
+OSC_RESULT_HOLD_SECONDS = 8.0
 
 
 def as_int(value, default=0):
@@ -203,6 +212,13 @@ async def main():
     event_queue = asyncio.Queue()
     source = SseClient(loop, event_queue)
     osc = OscChatboxPublisher()
+    osc_card = {
+        "text": format_presence({"status": "MENU"}),
+        "kind": "MENU",
+    }
+    result_hold_until = [0.0]
+    last_osc_send_at = [0.0]
+    osc_sent_once = [False]
     last_counts = {1: None, 2: None}
     install_wakeup = asyncio.Event()
     install_state = {
@@ -331,6 +347,7 @@ async def main():
             return
 
         last_osc_error[0] = None
+        osc_sent_once[0] = False
         if osc.enabled:
             osc_state.update({
                 "state": "ok",
@@ -359,10 +376,36 @@ async def main():
                 await log(ws, "error", "VRChat OSC 发送失败：" + error)
                 await report(ws)
             return False
+        if sent:
+            last_osc_send_at[0] = time.monotonic()
+            if not osc_sent_once[0]:
+                osc_sent_once[0] = True
+                osc_state.update({
+                    "state": "ok",
+                    "detail": "正在持续发送到 {0}:{1}（UDP）".format(
+                        osc.host, osc.port
+                    ),
+                    "hint": "每 5 秒保活；VRChat 中需启用 OSC",
+                })
+                await report(ws)
         if sent and last_osc_error[0] is not None:
             configure_osc()
             await report(ws)
         return sent
+
+    async def set_osc_card(ws, text, kind, force=False):
+        osc_card["text"] = text
+        osc_card["kind"] = kind
+        if osc.enabled:
+            await publish_osc(ws, text, force=force)
+
+    async def osc_keepalive_loop(ws):
+        while True:
+            await asyncio.sleep(1.0)
+            if not osc.enabled or not osc_card["text"]:
+                continue
+            if time.monotonic() - last_osc_send_at[0] >= OSC_KEEPALIVE_SECONDS:
+                await publish_osc(ws, osc_card["text"], force=True)
 
     async def installer_loop(ws):
         nonlocal install_state
@@ -455,13 +498,14 @@ async def main():
             return
 
         if osc.enabled and player == as_int(cfg["osc_player"], 1):
-            await publish_osc(
+            await set_osc_card(
                 ws,
                 format_playing(
                     event,
                     show_artist=bool(cfg["osc_show_artist"]),
                     show_judgements=bool(cfg["osc_show_judgements"]),
                 ),
+                "PLAYING",
             )
 
         if not player_enabled(player):
@@ -513,13 +557,15 @@ async def main():
             and player == as_int(cfg["osc_player"], 1)
             and bool(cfg["osc_show_result"])
         ):
-            await publish_osc(
+            result_hold_until[0] = time.monotonic() + OSC_RESULT_HOLD_SECONDS
+            await set_osc_card(
                 ws,
                 format_result(
                     event,
                     show_artist=bool(cfg["osc_show_artist"]),
                     show_judgements=bool(cfg["osc_show_judgements"]),
                 ),
+                "RESULT",
                 force=True,
             )
 
@@ -570,6 +616,18 @@ async def main():
                 await report(ws)
             elif event.get("event") == "settle":
                 await on_settle(ws, event)
+            elif event.get("event") == "presence":
+                status = str(event.get("status") or "MENU").upper()
+                if not (
+                    status == "MENU"
+                    and time.monotonic() < result_hold_until[0]
+                ):
+                    await set_osc_card(
+                        ws,
+                        format_presence(event),
+                        status,
+                        force=osc_card["kind"] != status,
+                    )
             elif event.get("event") == "state":
                 if event.get("status") != "PLAYING":
                     last_counts[1] = None
@@ -595,6 +653,7 @@ async def main():
         await report(ws)
         processor = asyncio.create_task(process_events(ws))
         installer = asyncio.create_task(installer_loop(ws))
+        keepalive = asyncio.create_task(osc_keepalive_loop(ws))
         try:
             async for raw in ws:
                 message = json.loads(raw)
@@ -607,6 +666,8 @@ async def main():
                         if key in data:
                             cfg[key] = data[key]
                     configure_osc()
+                    if osc.enabled:
+                        await publish_osc(ws, osc_card["text"], force=True)
                     source.start(str(cfg["endpoint"]))
                     install_wakeup.set()
                     await report(ws)
@@ -627,6 +688,8 @@ async def main():
                             last_counts[2] = None
                         elif key.startswith("osc_"):
                             configure_osc()
+                            if osc.enabled:
+                                await publish_osc(ws, osc_card["text"], force=True)
                             await report(ws)
                 elif operation == "ping":
                     await ws.send(json.dumps({"op": "pong", "t": message.get("t")}))
@@ -635,8 +698,13 @@ async def main():
             osc.close()
             processor.cancel()
             installer.cancel()
+            keepalive.cancel()
             try:
                 await processor
+            except asyncio.CancelledError:
+                pass
+            try:
+                await keepalive
             except asyncio.CancelledError:
                 pass
             try:

@@ -142,6 +142,25 @@ internal static class BridgeServerHarness
             throw new Exception("snapshot metadata JSON escaping failed: " + json);
         }
 
+        MaiDGBridge.PresenceSnapshot presence = new MaiDGBridge.PresenceSnapshot
+        {
+            Status = "SELECTING",
+            Version = "1.55.00",
+            Remaining = 42,
+            MusicId = 12345,
+            DifficultyId = 3,
+            Difficulty = "MASTER",
+            Title = "quote \" test",
+            Artist = "测试"
+        };
+        string presenceJson = presence.ToJson();
+        if (!presenceJson.Contains("\"event\":\"presence\"") ||
+            !presenceJson.Contains("\"remaining\":42") ||
+            !presenceJson.Contains("quote \\\" test"))
+        {
+            throw new Exception("presence JSON failed: " + presenceJson);
+        }
+
         TcpListener probe = new TcpListener(IPAddress.Loopback, 0);
         probe.Start();
         int port = ((IPEndPoint)probe.LocalEndpoint).Port;

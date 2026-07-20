@@ -44,6 +44,13 @@ async def main():
             "critical": 0, "perfect": 0, "great": 0, "good": 0, "miss": 0,
         })
         await event({
+            "event": "presence", "status": "MENU", "version": "1.55.00",
+        })
+        await event({
+            "event": "presence", "status": "SELECTING", "remaining": 42,
+            "timer_infinite": False, "title": "Test Song", "difficulty": "MASTER",
+        })
+        await event({
             "event": "counts", "status": "PLAYING", "player": 1, "track": 1,
             "critical": 0, "perfect": 0, "great": 0, "good": 0, "miss": 1,
         }, with_space=False)
@@ -63,7 +70,7 @@ async def main():
             "achievement": 95.1234,
         })
         source_done.set()
-        await asyncio.sleep(1)
+        await asyncio.sleep(7)
         writer.close()
         await writer.wait_closed()
 
@@ -101,7 +108,7 @@ async def main():
             await asyncio.sleep(0.2)
             continue_events.set()
             await source_done.wait()
-            await asyncio.sleep(0.4)
+            await asyncio.sleep(5.4)
             await ws.send(json.dumps({"op": "ping", "t": 12345}))
             await asyncio.sleep(0.2)
             await ws.send(json.dumps({"op": "stop"}))
@@ -169,7 +176,14 @@ async def main():
     ), received
     assert any(b",sTF" in packet and b"ACH 0.0000%" in packet for packet in osc_packets), osc_packets
     assert any(b",sTF" in packet and b"RESULT 95.1234%" in packet for packet in osc_packets), osc_packets
-    print("integration ok: handshake, SSE, triggers, VRChat OSC, pong, stop")
+    assert any(
+        "【舞萌DX】".encode("utf-8") in packet
+        and "正在选歌".encode("utf-8") in packet
+        for packet in osc_packets
+    ), osc_packets
+    result_packets = [packet for packet in osc_packets if b"RESULT 95.1234%" in packet]
+    assert len(result_packets) >= 2, len(result_packets)
+    print("integration ok: handshake, SSE, presence, keepalive, triggers, VRChat OSC, pong, stop")
 
 
 if __name__ == "__main__":

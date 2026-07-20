@@ -12,6 +12,7 @@ from vrchat_osc import (  # noqa: E402
     OscChatboxPublisher,
     encode_osc_message,
     format_playing,
+    format_presence,
     sanitize_chatbox_text,
 )
 
@@ -77,6 +78,25 @@ def test_text_limits_and_format():
     assert "MASTER" in normal and "定数 12.4" in normal and "42%" in normal
 
 
+def test_presence_format():
+    menu = format_presence({"status": "MENU", "version": "1.55.00"})
+    assert menu == "【舞萌DX】\n在主界面中\n版本号 1.55.00"
+    selecting = format_presence({
+        "status": "SELECTING",
+        "remaining": 42,
+        "title": "ぱぴぷぺぽ",
+        "difficulty": "MASTER",
+    })
+    assert selecting == "【舞萌DX】\n42s 正在选歌：\nぱぴぷぺぽ MASTER"
+    infinite = format_presence({
+        "status": "SELECTING",
+        "timer_infinite": True,
+        "title": "Song",
+        "difficulty": "EXPERT",
+    })
+    assert infinite.startswith("【舞萌DX】\n∞ 正在选歌：")
+
+
 def test_target_validation():
     publisher = OscChatboxPublisher()
     for host in ("127.0.0.1", "10.0.0.168", "172.16.0.2", "192.168.1.42"):
@@ -118,6 +138,7 @@ def test_udp_publish_and_throttle():
 if __name__ == "__main__":
     test_encoding_and_unicode()
     test_text_limits_and_format()
+    test_presence_format()
     test_target_validation()
     test_udp_publish_and_throttle()
     print("osc ok: encoding, Unicode limits, target validation, UDP, throttle")

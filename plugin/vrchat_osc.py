@@ -123,6 +123,28 @@ def _compose_lines(header, artist, chart, score, judgements):
     return sanitize_chatbox_text(rendered())
 
 
+def format_presence(event):
+    status = str(event.get("status") or "MENU").upper()
+    if status == "SELECTING":
+        if bool(event.get("timer_infinite")):
+            countdown = "∞"
+        else:
+            countdown = "{0}s".format(max(0, int(_number(event.get("remaining")))))
+        title = str(event.get("title") or "未知歌曲").strip()
+        difficulty = str(
+            event.get("difficulty") or event.get("chart") or ""
+        ).strip()
+        song = " ".join(part for part in (title, difficulty) if part)
+        return sanitize_chatbox_text(
+            "【舞萌DX】\n{0} 正在选歌：\n{1}".format(countdown, song)
+        )
+
+    version = str(event.get("version") or "读取中").strip()
+    return sanitize_chatbox_text(
+        "【舞萌DX】\n在主界面中\n版本号 {0}".format(version)
+    )
+
+
 def format_playing(event, show_artist=True, show_judgements=True):
     header = _song_line(event, "maimai DX")
     artist = str(event.get("artist") or "").strip()

@@ -1,10 +1,10 @@
 {
   "id": "maimai_link",
   "name": "maimai DX · DGHub 联动",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "sdk": "1",
   "author": "XiaoLan9999",
-  "description": "接收本机 MaiDGBridge 的 maimai DX 实时数据，触发 DGHub，并可通过局域网显示 VRChat OSC 正在游玩信息。",
+  "description": "接收本机 maimai DX 实时数据，触发 DGHub，并通过局域网持续显示 VRChat OSC 游戏状态。",
   "homepage": "https://github.com/XiaoLan9999/maimai-dghub-link",
   "entry": "main.py",
   "capabilities": { "startup_check": true },
@@ -63,7 +63,7 @@
           "type": "bool",
           "label": "启用 VRChat Chatbox",
           "default": false,
-          "description": "通过标准 OSC UDP 发送正在游玩与结算信息；VRChat 中也需要启用 OSC"
+          "description": "通过标准 OSC UDP 持续发送主界面、选歌、正在游玩与结算信息；VRChat 中也需要启用 OSC"
         },
         {
           "key": "osc_host",
