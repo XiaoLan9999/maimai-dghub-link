@@ -53,6 +53,11 @@ namespace HarmonyLib
 
     public static class AccessTools
     {
+        public static Type TypeByName(string name)
+        {
+            return Type.GetType(name);
+        }
+
         public static System.Reflection.MethodInfo Method(
             Type type,
             string name,
@@ -120,6 +125,23 @@ internal static class BridgeServerHarness
 {
     public static int Main()
     {
+        MaiDGBridge.Snapshot snapshot = new MaiDGBridge.Snapshot
+        {
+            Player = 1,
+            Track = 2,
+            Title = "quote \" and newline\n",
+            Artist = "测试",
+            Chart = "MASTER",
+            Level = "13+",
+            Progress = 0.5m
+        };
+        string json = snapshot.ToJson("counts", "PLAYING");
+        if (!json.Contains("quote \\\" and newline\\n") ||
+            !json.Contains("\"progress\":0.5000"))
+        {
+            throw new Exception("snapshot metadata JSON escaping failed: " + json);
+        }
+
         TcpListener probe = new TcpListener(IPAddress.Loopback, 0);
         probe.Start();
         int port = ((IPEndPoint)probe.LocalEndpoint).Port;

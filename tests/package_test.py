@@ -9,6 +9,7 @@ REQUIRED = {
     "manifest.json",
     "main.py",
     "installer.py",
+    "vrchat_osc.py",
     "SOURCE.md",
     "LICENSE",
     "payload/bridge.json",
@@ -18,12 +19,16 @@ REQUIRED = {
 
 
 def main():
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: package_test.py <plugin.zip>")
+    if len(sys.argv) not in (2, 3):
+        raise SystemExit("usage: package_test.py <plugin.zip> [expected_id]")
     archive = pathlib.Path(sys.argv[1])
+    expected_id = sys.argv[2] if len(sys.argv) == 3 else "maimai_link"
     with zipfile.ZipFile(archive) as bundle:
         names = {name.replace("\\", "/") for name in bundle.namelist()}
-        assert REQUIRED <= names, sorted(REQUIRED - names)
+        required = set(REQUIRED)
+        if expected_id == "maimai_vrchat_osc":
+            required.add("sse.py")
+        assert required <= names, sorted(required - names)
         assert all(not name.startswith("/") and ".." not in name.split("/") for name in names)
 
         def read(name):
@@ -34,15 +39,26 @@ def main():
         descriptor = json.loads(read("payload/bridge.json").decode("utf-8-sig"))
         dll_hash = hashlib.sha256(read("payload/MaiDGBridge.dll")).hexdigest()
 
-    assert manifest["id"] == "maimai_link", manifest
+    assert manifest["id"] == expected_id, manifest
     assert manifest["version"] == descriptor["plugin_version"], descriptor
     assert descriptor["bridge_version"] == manifest["version"], descriptor
     assert descriptor["sha256"] == dll_hash, descriptor
     assert manifest["author"] == "XiaoLan9999", manifest
+    all_fields = {
+        field["key"]: field
+        for section in manifest["config_schema"]
+        for field in section["fields"]
+    }
+    osc_fields = {key: field for key, field in all_fields.items() if key.startswith("osc_")}
+    assert osc_fields["osc_enabled"]["default"] is False, osc_fields
+    assert osc_fields["osc_port"]["default"] == "9000", osc_fields
+    if expected_id == "maimai_vrchat_osc":
+        assert "settle_enabled" not in all_fields, all_fields
+        assert "miss_strength" not in all_fields, all_fields
     assert archive.stat().st_size < 20 * 1024 * 1024
     print(
-        "package ok: {0} {1} files, {2} bytes, sha256={3}".format(
-            manifest["version"], len(names), archive.stat().st_size, dll_hash
+        "package ok: {0} {1} {2} files, {3} bytes, sha256={4}".format(
+            manifest["id"], manifest["version"], len(names), archive.stat().st_size, dll_hash
         )
     )
 
