@@ -37,6 +37,17 @@ For manual fallback, extract `payload/MaiDGBridge.dll` and `payload/MaiDGBridge.
 
 Only 1P MISS triggers are enabled by default. GOOD, GREAT, PERFECT, CRITICAL, 2P, same-frame strength stacking, and result triggers can be enabled independently in the DGHub plugin configuration.
 
+### SDEZ 1.66 package note
+
+The prepared SDEZ 1.66 package uses the sibling `AMDaemon` runtime and must be started with the package-level `启动.bat` (or its ASCII `start-166.bat` alias). Do not double-click `Package/Sinmai.exe`; it will not have an AMDaemon IPC peer.
+
+For this package, keep these two files as a matched pair from the same external AMDaemon runtime:
+
+- `Sinmai_Data/Plugins/amdaemon_api.dll` (the 3,132,928-byte API bridge)
+- `Sinmai_Data/Managed/AMDaemon.NET.dll` (the 183,808-byte managed wrapper)
+
+The launcher checks the `odd` driver, starts AMDaemon first, then starts Sinmai and writes a diagnostic log to `logs/startup.log`. The 1.66 runtime has been verified to reach the song-select/play screen, load all three mods, connect DGHub, and publish live judgement data through `127.0.0.1:8891/events`.
+
 ## Bridge configuration
 
 `MaiDGBridge.ini`:
@@ -135,6 +146,7 @@ The judgement hook has been compiled against the `Assembly-CSharp.dll` from thre
 | `SDGB1.50/Package` | Compile compatible |
 | `SDGB1.55-lazyPacker/Package` | Compile compatible and runtime end-to-end tested |
 | `SDEZ160/Package` | Compile compatible |
+| `SDEZ1.65/Package` (SDEZ 1.66 update) | Runtime end-to-end tested with the external AMDaemon compatibility pair |
 
 All three versions retain these key interfaces:
 
