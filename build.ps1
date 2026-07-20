@@ -45,6 +45,7 @@ if ($LASTEXITCODE -ne 0) {
 Copy-Item -LiteralPath (Join-Path $root "bridge\MaiDGBridge.ini") -Destination $gameMod
 Copy-Item -LiteralPath (Join-Path $root "plugin\main.py") -Destination $pluginStage
 Copy-Item -LiteralPath (Join-Path $root "plugin\installer.py") -Destination $pluginStage
+Copy-Item -LiteralPath (Join-Path $root "plugin\vrchat_osc.py") -Destination $pluginStage
 Copy-Item -LiteralPath (Join-Path $root "plugin\SOURCE.md") -Destination $pluginStage
 Copy-Item -LiteralPath $manifestPath -Destination $pluginStage
 Copy-Item -LiteralPath (Join-Path $root "LICENSE") -Destination $pluginStage
@@ -68,6 +69,7 @@ $pluginZip = Join-Path $dist "maimai_link-$version.zip"
 Compress-Archive -Path (Join-Path $pluginStage "*") -DestinationPath $pluginZip
 Remove-Item -LiteralPath $pluginStage -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination $dist
+Copy-Item -LiteralPath (Join-Path $root "README.zh-CN.md") -Destination $dist
 
 Write-Output "Built: $pluginZip"
 Write-Output "Built: $gameMod"
