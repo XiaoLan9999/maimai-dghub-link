@@ -18,7 +18,7 @@ The bridge uses Harmony to hook the game's own `JudgeResultSt.UpdateScore` entry
 
 ## Installation
 
-1. Import `maimai_link-1.4.2.zip` in DGHub and enable the plugin.
+1. Import `maimai_link-1.4.3.zip` in DGHub and enable the plugin.
 2. If the game is already running, the plugin detects its `Package` directory and installs the bundled bridge automatically. Restart the game once so MelonLoader can load it.
 3. If the game isn't running or automatic detection doesn't find it, open the plugin configuration and select the directory that contains `Sinmai.exe` under **Game Package directory**. Installation starts immediately.
 
@@ -31,6 +31,8 @@ No manual DLL copy is required. The installer:
 - never replaces an older DLL while that game instance is running.
 
 Automatic detection only checks running processes named `Sinmai.exe`; it doesn't scan whole drives. DGHub and the game can subsequently be started in either order because the plugin reconnects automatically.
+
+When switching packages, the single running `Sinmai.exe` takes precedence over a stale configured path and the plugin persists the newly selected `Package`. DGHub's current external-plugin SDK does not expose custom action buttons; the existing **Startup Check** entry opens the live **maimai DX Bridge Check**, which is refreshed automatically every three seconds. Compatible newer MaiDGBridge builds installed by another integration are retained instead of being downgraded back and forth.
 
 For manual fallback, extract `payload/MaiDGBridge.dll` and `payload/MaiDGBridge.ini` from the plugin ZIP, then copy them to `Package/Mods` and `Package` respectively.
 

@@ -18,7 +18,7 @@ Sinmai / MelonLoader
 
 ## 安装
 
-1. 在 DGHub 中导入 `maimai_link-1.4.2.zip`，然后启用插件。
+1. 在 DGHub 中导入 `maimai_link-1.4.3.zip`，然后启用插件。
 2. 如果游戏正在运行，插件会自动识别它的 `Package` 目录并安装内置桥接。安装完成后重启一次游戏，让 MelonLoader 加载桥接。
 3. 如果游戏尚未运行或没有自动识别，在插件配置的“游戏 Package 目录”中选择包含 `Sinmai.exe` 的目录，插件会立即安装。
 
@@ -31,6 +31,8 @@ Sinmai / MelonLoader
 - 游戏正在使用旧版 DLL 时不强行覆盖，关闭游戏后自动继续更新。
 
 自动识别只检查名为 `Sinmai.exe` 的运行进程，不会扫描整块硬盘。完成首次安装后，DGHub 和游戏的启动顺序不限，插件会自动重连。
+
+切换包体时，如果只有一个 `Sinmai.exe` 正在运行，插件会优先采用该进程所在的 `Package` 并更新旧配置路径。DGHub 当前插件接口不支持自定义操作按钮；配置页现有的“启动检查”入口会显示“maimai DX 桥接检查”，其内容由插件每 3 秒自动重检。插件也会保留由兼容程序安装的更高版本 MaiDGBridge，避免不同联动程序互相降级覆盖。
 
 如需手动安装，可以从插件 ZIP 的 `payload` 目录提取 `MaiDGBridge.dll` 和 `MaiDGBridge.ini`，分别复制到 `Package/Mods` 与 `Package`。
 

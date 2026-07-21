@@ -88,7 +88,45 @@ def main():
         )
         assert invalid["state"] == "fail", invalid
 
-    print("installer ok: detect, install, idempotence, compatible bridge, running-game deferral, backup, upgrade")
+        other_package = root / "other-game" / "Package"
+        (other_package / "Mods").mkdir(parents=True)
+        (other_package / "MelonLoader").mkdir()
+        (other_package / "Sinmai.exe").write_bytes(b"other executable")
+        switched = ensure_bridge_installed(
+            str(plugin),
+            str(package),
+            auto_detect=True,
+            running_packages=[str(other_package)],
+        )
+        assert switched["state"] == "warn", switched
+        assert switched["detected"], switched
+        assert switched["restart_required"], switched
+        assert pathlib.Path(switched["package"]) == other_package, switched
+        assert (other_package / "Mods" / "MaiDGBridge.dll").is_file()
+
+        write_payload(plugin, "1.4.3", b"older bundled bridge")
+        newer_dll = b"newer shared bridge"
+        newer_destination = other_package / "Mods" / "MaiDGBridge.dll"
+        newer_destination.write_bytes(newer_dll)
+        (other_package / "MaiDGBridge.dghub.json").write_text(
+            json.dumps({
+                "plugin": "maimai_vrchat_osc_standalone",
+                "bridge_version": "1.4.10",
+                "dll_sha256": hashlib.sha256(newer_dll).hexdigest(),
+            }),
+            encoding="utf-8",
+        )
+        compatible_newer = ensure_bridge_installed(
+            str(plugin),
+            str(other_package),
+            auto_detect=False,
+            running_packages=[],
+        )
+        assert compatible_newer["state"] == "ok", compatible_newer
+        assert "1.4.10" in compatible_newer["detail"], compatible_newer
+        assert newer_destination.read_bytes() == newer_dll
+
+    print("installer ok: detect, switch, install, compatible newer bridge, deferral, backup, upgrade")
 
 
 if __name__ == "__main__":

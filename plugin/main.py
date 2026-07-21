@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import urllib.request
+from datetime import datetime
 
 from installer import ensure_bridge_installed
 try:
@@ -213,6 +214,7 @@ async def main():
     }
     restart_notice = [False]
     last_status = [None]
+    last_checked_at = [""]
 
     async def report(ws):
         bridge_state = dict(install_state)
@@ -237,7 +239,8 @@ async def main():
         fields = {
             "display_status": display,
             "startup_check": {
-                "title": "maimai DX 联动启动检查",
+                "title": "maimai DX 桥接检查",
+                "updated_at": last_checked_at[0],
                 "steps": [
                     {
                         "key": "plugin",
@@ -247,7 +250,7 @@ async def main():
                     },
                     {
                         "key": "game_path",
-                        "title": "游戏目录",
+                        "title": "当前游戏包体",
                         "state": bridge_state.get("path_state", "pending"),
                         "detail": bridge_state.get("path_detail", "尚未找到游戏目录"),
                         "hint": "可在插件配置中填写包含 Sinmai.exe 的 Package 目录",
@@ -311,6 +314,7 @@ async def main():
                     "backup": "",
                 }
             install_state = result
+            last_checked_at[0] = datetime.now().isoformat(timespec="seconds")
             if result.get("restart_required"):
                 restart_notice[0] = True
             elif restart_notice[0] and not result.get("game_running"):
@@ -454,6 +458,7 @@ async def main():
                     "detail": "已连接 " + event["_connected"],
                     "hint": "已就绪；开始歌曲后会接收实时判定",
                 })
+                install_wakeup.set()
                 await report(ws)
             elif "_error" in event:
                 last_counts[1] = None
@@ -463,6 +468,7 @@ async def main():
                     "detail": "尚未连接；正在重试（{0}）".format(event["_error"]),
                     "hint": "确认桥接已安装并启动游戏",
                 })
+                install_wakeup.set()
                 await report(ws)
             elif event.get("event") == "settle":
                 await on_settle(ws, event)

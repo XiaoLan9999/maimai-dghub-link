@@ -1,7 +1,7 @@
 {
   "id": "maimai_link",
   "name": "maimai DX · DGHub 联动",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "sdk": "1",
   "author": "XiaoLan9999",
   "description": "接收本机 maimai DX 实时数据并触发 DGHub 郊狼效果。VRChat OSC 由独立软件 maimai-vrchat-osc 负责。",
@@ -24,7 +24,8 @@
           "key": "auto_detect_game",
           "type": "bool",
           "label": "从运行中的游戏自动识别目录",
-          "default": true
+          "default": true,
+          "description": "启用后，当前唯一运行中的 Sinmai.exe 优先于旧配置路径，切换包体时会自动更新"
         },
         {
           "key": "auto_install_bridge",

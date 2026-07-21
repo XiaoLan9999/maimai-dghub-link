@@ -229,19 +229,35 @@ def _write_marker(package, descriptor, dll_hash, backup):
             os.unlink(temporary)
 
 
-def _compatible_installed_build(package, descriptor, destination_hash):
+def _read_installed_marker(package, destination_hash):
     marker_path = os.path.join(package, MARKER_NAME)
     if not destination_hash or not os.path.isfile(marker_path):
-        return False
+        return {}
     try:
         with open(marker_path, encoding="utf-8-sig") as source:
             marker = json.load(source)
     except (OSError, ValueError, TypeError):
-        return False
-    return (
-        str(marker.get("bridge_version", ""))
-        == str(descriptor.get("bridge_version", ""))
-        and str(marker.get("dll_sha256", "")).lower() == destination_hash
+        return {}
+    if str(marker.get("dll_sha256", "")).lower() != destination_hash:
+        return {}
+    return marker
+
+
+def _numeric_version(value):
+    parts = str(value or "").strip().split(".")
+    if not parts or any(not part.isdigit() for part in parts):
+        return None
+    return tuple(int(part) for part in parts)
+
+
+def _version_at_least(installed, required):
+    installed_parts = _numeric_version(installed)
+    required_parts = _numeric_version(required)
+    if installed_parts is None or required_parts is None:
+        return str(installed or "") == str(required or "")
+    width = max(len(installed_parts), len(required_parts))
+    return installed_parts + (0,) * (width - len(installed_parts)) >= (
+        required_parts + (0,) * (width - len(required_parts))
     )
 
 
@@ -253,16 +269,8 @@ def ensure_bridge_installed(
     running_packages=None,
 ):
     configured = str(configured_path or "").strip()
+    configured_package = resolve_package_path(configured)
     detected = False
-    package = resolve_package_path(configured)
-    if configured and package is None:
-        return _result(
-            "fail",
-            "游戏目录无效，未安装桥接",
-            "请选择包含 Sinmai.exe 的 Package 目录，或它的上一级目录",
-            path_state="fail",
-            path_detail="配置的目录中未找到 Sinmai.exe",
-        )
 
     if running_packages is None:
         running_packages = find_running_game_packages()
@@ -271,18 +279,34 @@ def ensure_bridge_installed(
             item for item in (resolve_package_path(path) for path in running_packages) if item
         ]
 
-    if package is None and auto_detect:
+    package = configured_package
+    if auto_detect:
         if len(running_packages) == 1:
             package = running_packages[0]
-            detected = True
-        elif len(running_packages) > 1:
-            return _result(
-                "warn",
-                "检测到多个正在运行的游戏，未自动安装",
-                "请在插件配置中填写要使用的 Package 目录",
-                path_state="warn",
-                path_detail="检测到多个 Sinmai.exe",
+            detected = configured_package is None or not _same_path(
+                configured_package, package
             )
+        elif len(running_packages) > 1:
+            configured_is_running = configured_package is not None and any(
+                _same_path(configured_package, item) for item in running_packages
+            )
+            if not configured_is_running:
+                return _result(
+                    "warn",
+                    "检测到多个正在运行的游戏，未自动切换",
+                    "请只保留一个游戏运行，或填写其中一个 Package 目录",
+                    path_state="warn",
+                    path_detail="检测到多个 Sinmai.exe，无法确定当前包体",
+                )
+
+    if package is None and configured:
+        return _result(
+            "fail",
+            "游戏目录无效，未安装桥接",
+            "请选择包含 Sinmai.exe 的 Package 目录，或启动游戏让插件重新识别",
+            path_state="fail",
+            path_detail="配置的目录中未找到 Sinmai.exe",
+        )
 
     if package is None:
         return _result(
@@ -311,9 +335,13 @@ def ensure_bridge_installed(
     ini_destination = os.path.join(package, INI_NAME)
     destination_hash = _sha256(dll_destination) if os.path.isfile(dll_destination) else ""
 
-    if destination_hash == payload_hash or _compatible_installed_build(
-        package, descriptor, destination_hash
-    ):
+    installed_marker = _read_installed_marker(package, destination_hash)
+    installed_version = str(installed_marker.get("bridge_version", ""))
+    required_version = str(descriptor.get("bridge_version", ""))
+    compatible_newer_build = installed_marker and _version_at_least(
+        installed_version, required_version
+    )
+    if destination_hash == payload_hash or compatible_newer_build:
         if not os.path.isfile(ini_destination) and auto_install:
             try:
                 _atomic_copy(payload_ini, ini_destination)
@@ -329,9 +357,10 @@ def ensure_bridge_installed(
                     installed=True,
                     game_running=package_running,
                 )
+        active_version = installed_version if compatible_newer_build else required_version
         return _result(
             "ok",
-            "MaiDGBridge {0} 已安装".format(descriptor.get("bridge_version", "")),
+            "MaiDGBridge {0} 已安装".format(active_version),
             package=package,
             path_state="ok",
             path_detail=path_detail,
