@@ -1,4 +1,4 @@
-"""DGHub plugin for the local MaiDGBridge maimai DX event stream."""
+"""DGHub plugin for the local XiaoLanMaiBrdge maimai DX event stream."""
 
 import asyncio
 import json
@@ -209,7 +209,7 @@ async def main():
     }
     stream_state = {
         "state": "pending",
-        "detail": "等待 MaiDGBridge 数据流",
+        "detail": "等待 XiaoLanMaiBrdge 数据流",
         "hint": "安装桥接后启动游戏；插件会自动重连",
     }
     restart_notice = [False]
@@ -257,7 +257,7 @@ async def main():
                     },
                     {
                         "key": "bridge_install",
-                        "title": "MaiDGBridge 自动安装",
+                        "title": "XiaoLanMaiBrdge 自动安装",
                         "state": bridge_state.get("state", "pending"),
                         "detail": bridge_state.get("detail", "等待安装"),
                         "hint": bridge_state.get("hint", ""),

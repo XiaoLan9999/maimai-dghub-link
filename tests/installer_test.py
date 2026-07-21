@@ -14,9 +14,9 @@ from installer import ensure_bridge_installed  # noqa: E402
 def write_payload(plugin, version, content):
     payload = plugin / "payload"
     payload.mkdir(parents=True, exist_ok=True)
-    dll = payload / "MaiDGBridge.dll"
+    dll = payload / "XiaoLanMaiBrdge.dll"
     dll.write_bytes(content)
-    (payload / "MaiDGBridge.ini").write_text(
+    (payload / "XiaoLanMaiBrdge.ini").write_text(
         "Enabled=true\nPort=8891\nPublishIntervalMs=250\n", encoding="utf-8"
     )
     descriptor = {
@@ -39,14 +39,35 @@ def main():
         (package / "Sinmai.exe").write_bytes(b"test executable")
 
         write_payload(plugin, "1.2.0", b"bridge version 1")
+        (package / "Mods" / "MaiDGBridge.dll").write_bytes(b"legacy bridge")
+        (package / "MaiDGBridge.ini").write_text(
+            "Enabled=true\nPort=8891\nPublishIntervalMs=175\n", encoding="utf-8"
+        )
+        (package / "MaiDGBridge.dghub.json").write_text("{}", encoding="utf-8")
+        legacy_deferred = ensure_bridge_installed(
+            str(plugin), str(package), auto_detect=False,
+            running_packages=[str(package)],
+        )
+        assert legacy_deferred["state"] == "warn", legacy_deferred
+        assert (package / "Mods" / "MaiDGBridge.dll").is_file()
+        assert not (package / "Mods" / "XiaoLanMaiBrdge.dll").exists()
+
         first = ensure_bridge_installed(
             str(plugin), str(package), auto_detect=False, running_packages=[]
         )
         assert first["state"] == "ok", first
         assert first["installed"], first
-        assert (package / "Mods" / "MaiDGBridge.dll").read_bytes() == b"bridge version 1"
-        assert (package / "MaiDGBridge.ini").is_file()
-        assert (package / "MaiDGBridge.dghub.json").is_file()
+        assert (package / "Mods" / "XiaoLanMaiBrdge.dll").read_bytes() == b"bridge version 1"
+        assert (package / "XiaoLanMaiBrdge.ini").read_text(encoding="utf-8").endswith(
+            "PublishIntervalMs=175\n"
+        )
+        assert (package / "XiaoLanMaiBrdge.dghub.json").is_file()
+        assert not (package / "Mods" / "MaiDGBridge.dll").exists()
+        assert not (package / "MaiDGBridge.ini").exists()
+        assert not (package / "MaiDGBridge.dghub.json").exists()
+        assert (
+            pathlib.Path(first["backup"]) / "Mods" / "MaiDGBridge.dll"
+        ).read_bytes() == b"legacy bridge"
 
         second = ensure_bridge_installed(
             str(plugin), str(package.parent), auto_detect=False, running_packages=[]
@@ -60,7 +81,7 @@ def main():
         )
         assert equivalent["state"] == "ok", equivalent
         assert not equivalent["backup"], equivalent
-        assert (package / "Mods" / "MaiDGBridge.dll").read_bytes() == b"bridge version 1"
+        assert (package / "Mods" / "XiaoLanMaiBrdge.dll").read_bytes() == b"bridge version 1"
 
         write_payload(plugin, "1.2.1", b"bridge version 2")
         deferred = ensure_bridge_installed(
@@ -71,16 +92,16 @@ def main():
         )
         assert deferred["state"] == "warn", deferred
         assert not deferred["installed"], deferred
-        assert (package / "Mods" / "MaiDGBridge.dll").read_bytes() == b"bridge version 1"
+        assert (package / "Mods" / "XiaoLanMaiBrdge.dll").read_bytes() == b"bridge version 1"
 
         upgraded = ensure_bridge_installed(
             str(plugin), str(package), auto_detect=False, running_packages=[]
         )
         assert upgraded["state"] == "ok", upgraded
         assert pathlib.Path(upgraded["backup"]).is_dir(), upgraded
-        assert (package / "Mods" / "MaiDGBridge.dll").read_bytes() == b"bridge version 2"
+        assert (package / "Mods" / "XiaoLanMaiBrdge.dll").read_bytes() == b"bridge version 2"
         assert (
-            pathlib.Path(upgraded["backup"]) / "Mods" / "MaiDGBridge.dll"
+            pathlib.Path(upgraded["backup"]) / "Mods" / "XiaoLanMaiBrdge.dll"
         ).read_bytes() == b"bridge version 1"
 
         invalid = ensure_bridge_installed(
@@ -102,13 +123,13 @@ def main():
         assert switched["detected"], switched
         assert switched["restart_required"], switched
         assert pathlib.Path(switched["package"]) == other_package, switched
-        assert (other_package / "Mods" / "MaiDGBridge.dll").is_file()
+        assert (other_package / "Mods" / "XiaoLanMaiBrdge.dll").is_file()
 
         write_payload(plugin, "1.4.3", b"older bundled bridge")
         newer_dll = b"newer shared bridge"
-        newer_destination = other_package / "Mods" / "MaiDGBridge.dll"
+        newer_destination = other_package / "Mods" / "XiaoLanMaiBrdge.dll"
         newer_destination.write_bytes(newer_dll)
-        (other_package / "MaiDGBridge.dghub.json").write_text(
+        (other_package / "XiaoLanMaiBrdge.dghub.json").write_text(
             json.dumps({
                 "plugin": "maimai_vrchat_osc_standalone",
                 "bridge_version": "1.4.10",

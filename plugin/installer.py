@@ -1,4 +1,4 @@
-"""Safe installer for the bundled MaiDGBridge MelonLoader mod."""
+"""Safe installer for the bundled XiaoLanMaiBrdge MelonLoader mod."""
 
 import ctypes
 import hashlib
@@ -9,10 +9,13 @@ import tempfile
 from datetime import datetime
 
 
-DLL_NAME = "MaiDGBridge.dll"
-INI_NAME = "MaiDGBridge.ini"
-MARKER_NAME = "MaiDGBridge.dghub.json"
-BACKUP_DIR_NAME = "MaiDGBridge.backups"
+DLL_NAME = "XiaoLanMaiBrdge.dll"
+INI_NAME = "XiaoLanMaiBrdge.ini"
+MARKER_NAME = "XiaoLanMaiBrdge.dghub.json"
+BACKUP_DIR_NAME = "XiaoLanMaiBrdge.backups"
+LEGACY_DLL_NAME = "MaiDGBridge.dll"
+LEGACY_INI_NAME = "MaiDGBridge.ini"
+LEGACY_MARKER_NAME = "MaiDGBridge.dghub.json"
 
 
 def _result(
@@ -166,7 +169,7 @@ def _load_payload(plugin_root):
 def _atomic_copy(source, destination):
     directory = os.path.dirname(destination)
     os.makedirs(directory, exist_ok=True)
-    handle, temporary = tempfile.mkstemp(prefix=".maidgbridge-", dir=directory)
+    handle, temporary = tempfile.mkstemp(prefix=".xiaolanmaibrdge-", dir=directory)
     os.close(handle)
     try:
         shutil.copy2(source, temporary)
@@ -189,23 +192,46 @@ def _new_backup_dir(package):
     return candidate
 
 
-def _backup_existing(package, dll_destination, ini_destination):
-    existing = [path for path in (dll_destination, ini_destination) if os.path.isfile(path)]
-    marker = os.path.join(package, MARKER_NAME)
-    if os.path.isfile(marker):
-        existing.append(marker)
+def _installed_paths(package):
+    return (
+        os.path.join(package, "Mods", DLL_NAME),
+        os.path.join(package, INI_NAME),
+        os.path.join(package, MARKER_NAME),
+        os.path.join(package, "Mods", LEGACY_DLL_NAME),
+        os.path.join(package, LEGACY_INI_NAME),
+        os.path.join(package, LEGACY_MARKER_NAME),
+    )
+
+
+def _legacy_paths(package):
+    return (
+        os.path.join(package, "Mods", LEGACY_DLL_NAME),
+        os.path.join(package, LEGACY_INI_NAME),
+        os.path.join(package, LEGACY_MARKER_NAME),
+    )
+
+
+def _backup_existing(package):
+    existing = [path for path in _installed_paths(package) if os.path.isfile(path)]
     if not existing:
         return ""
 
     backup = _new_backup_dir(package)
+    mods = os.path.normcase(os.path.abspath(os.path.join(package, "Mods"))) + os.sep
     for path in existing:
-        if _same_path(path, dll_destination):
-            target = os.path.join(backup, "Mods", DLL_NAME)
+        if os.path.normcase(os.path.abspath(path)).startswith(mods):
+            target = os.path.join(backup, "Mods", os.path.basename(path))
             os.makedirs(os.path.dirname(target), exist_ok=True)
         else:
             target = os.path.join(backup, os.path.basename(path))
         shutil.copy2(path, target)
     return backup
+
+
+def _remove_legacy_install(package):
+    for path in _legacy_paths(package):
+        if os.path.isfile(path):
+            os.unlink(path)
 
 
 def _write_marker(package, descriptor, dll_hash, backup):
@@ -219,7 +245,7 @@ def _write_marker(package, descriptor, dll_hash, backup):
     }
     destination = os.path.join(package, MARKER_NAME)
     data = json.dumps(marker, ensure_ascii=False, indent=2).encode("utf-8")
-    handle, temporary = tempfile.mkstemp(prefix=".maidgbridge-marker-", dir=package)
+    handle, temporary = tempfile.mkstemp(prefix=".xiaolanmaibrdge-marker-", dir=package)
     try:
         with os.fdopen(handle, "wb") as output:
             output.write(data)
@@ -334,6 +360,7 @@ def ensure_bridge_installed(
     dll_destination = os.path.join(package, "Mods", DLL_NAME)
     ini_destination = os.path.join(package, INI_NAME)
     destination_hash = _sha256(dll_destination) if os.path.isfile(dll_destination) else ""
+    legacy_present = any(os.path.isfile(path) for path in _legacy_paths(package))
 
     installed_marker = _read_installed_marker(package, destination_hash)
     installed_version = str(installed_marker.get("bridge_version", ""))
@@ -341,7 +368,7 @@ def ensure_bridge_installed(
     compatible_newer_build = installed_marker and _version_at_least(
         installed_version, required_version
     )
-    if destination_hash == payload_hash or compatible_newer_build:
+    if (destination_hash == payload_hash or compatible_newer_build) and not legacy_present:
         if not os.path.isfile(ini_destination) and auto_install:
             try:
                 _atomic_copy(payload_ini, ini_destination)
@@ -360,7 +387,7 @@ def ensure_bridge_installed(
         active_version = installed_version if compatible_newer_build else required_version
         return _result(
             "ok",
-            "MaiDGBridge {0} 已安装".format(active_version),
+            "XiaoLanMaiBrdge {0} 已安装".format(active_version),
             package=package,
             path_state="ok",
             path_detail=path_detail,
@@ -381,7 +408,7 @@ def ensure_bridge_installed(
             game_running=package_running,
         )
 
-    if destination_hash and package_running:
+    if (destination_hash or legacy_present) and package_running:
         return _result(
             "warn",
             "检测到旧版桥接；游戏运行中，暂缓更新",
@@ -395,11 +422,13 @@ def ensure_bridge_installed(
 
     backup = ""
     try:
-        backup = _backup_existing(package, dll_destination, ini_destination)
+        backup = _backup_existing(package)
         _atomic_copy(payload_dll, dll_destination)
         if not os.path.isfile(ini_destination):
-            _atomic_copy(payload_ini, ini_destination)
+            legacy_ini = os.path.join(package, LEGACY_INI_NAME)
+            _atomic_copy(legacy_ini if os.path.isfile(legacy_ini) else payload_ini, ini_destination)
         _write_marker(package, descriptor, payload_hash, backup)
+        _remove_legacy_install(package)
     except OSError as exc:
         return _result(
             "fail",

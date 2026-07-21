@@ -1,7 +1,7 @@
 {
   "id": "maimai_link",
   "name": "maimai DX · DGHub 联动",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "sdk": "1",
   "author": "XiaoLan9999",
   "description": "接收本机 maimai DX 实时数据并触发 DGHub 郊狼效果。VRChat OSC 由独立软件 maimai-vrchat-osc 负责。",
@@ -30,7 +30,7 @@
         {
           "key": "auto_install_bridge",
           "type": "bool",
-          "label": "自动安装/更新 MaiDGBridge",
+          "label": "自动安装/更新 XiaoLanMaiBrdge",
           "default": true,
           "description": "安装前会备份已有 DLL 和配置；游戏运行中不会覆盖旧版 DLL"
         }
@@ -42,9 +42,9 @@
         {
           "key": "endpoint",
           "type": "text",
-          "label": "MaiDGBridge 数据端点",
+          "label": "XiaoLanMaiBrdge 数据端点",
           "default": "http://127.0.0.1:8891/events",
-          "description": "游戏 Mods 目录中的 MaiDGBridge.dll 提供的本机 SSE 地址"
+          "description": "游戏 Mods 目录中的 XiaoLanMaiBrdge.dll 提供的本机 SSE 地址"
         },
         { "key": "debug", "type": "bool", "label": "调试日志", "default": false }
       ]

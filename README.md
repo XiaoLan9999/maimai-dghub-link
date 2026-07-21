@@ -2,13 +2,13 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-MaiDGBridge forwards live maimai DX judgement data to DGHub, where each judgement tier can trigger a configurable DG-LAB event.
+XiaoLanMaiBrdge forwards live maimai DX judgement data to DGHub, where each judgement tier can trigger a configurable DG-LAB event.
 
 ## Architecture
 
 ```text
 Sinmai / MelonLoader
-  -> MaiDGBridge.dll (read-only judgement hook)
+  -> XiaoLanMaiBrdge.dll (read-only judgement hook)
   -> http://127.0.0.1:8891/events (loopback SSE)
   -> maimai_link external DGHub plugin
   -> DGHub trigger
@@ -18,23 +18,24 @@ The bridge uses Harmony to hook the game's own `JudgeResultSt.UpdateScore` entry
 
 ## Installation
 
-1. Import `maimai_link-1.4.3.zip` in DGHub and enable the plugin.
+1. Import `maimai_link-1.4.4.zip` in DGHub and enable the plugin.
 2. If the game is already running, the plugin detects its `Package` directory and installs the bundled bridge automatically. Restart the game once so MelonLoader can load it.
 3. If the game isn't running or automatic detection doesn't find it, open the plugin configuration and select the directory that contains `Sinmai.exe` under **Game Package directory**. Installation starts immediately.
 
 No manual DLL copy is required. The installer:
 
 - verifies the bundled bridge with SHA-256 before installation;
-- installs `MaiDGBridge.dll` to `Package/Mods` and creates `MaiDGBridge.ini` only when it is missing;
+- installs `XiaoLanMaiBrdge.dll` to `Package/Mods` and creates `XiaoLanMaiBrdge.ini` only when it is missing;
 - preserves an existing INI file during upgrades;
-- backs up replaced files under `Package/MaiDGBridge.backups/<timestamp>`;
+- backs up replaced files under `Package/XiaoLanMaiBrdge.backups/<timestamp>`;
+- migrates the legacy `MaiDGBridge` DLL, INI, and marker, then removes the legacy files so only one bridge is loaded;
 - never replaces an older DLL while that game instance is running.
 
 Automatic detection only checks running processes named `Sinmai.exe`; it doesn't scan whole drives. DGHub and the game can subsequently be started in either order because the plugin reconnects automatically.
 
-When switching packages, the single running `Sinmai.exe` takes precedence over a stale configured path and the plugin persists the newly selected `Package`. DGHub's current external-plugin SDK does not expose custom action buttons; the existing **Startup Check** entry opens the live **maimai DX Bridge Check**, which is refreshed automatically every three seconds. Compatible newer MaiDGBridge builds installed by another integration are retained instead of being downgraded back and forth.
+When switching packages, the single running `Sinmai.exe` takes precedence over a stale configured path and the plugin persists the newly selected `Package`. DGHub's current external-plugin SDK does not expose custom action buttons; the existing **Startup Check** entry opens the live **maimai DX Bridge Check**, which is refreshed automatically every three seconds. Compatible newer XiaoLanMaiBrdge builds installed by another integration are retained instead of being downgraded back and forth.
 
-For manual fallback, extract `payload/MaiDGBridge.dll` and `payload/MaiDGBridge.ini` from the plugin ZIP, then copy them to `Package/Mods` and `Package` respectively.
+For manual fallback, extract `payload/XiaoLanMaiBrdge.dll` and `payload/XiaoLanMaiBrdge.ini` from the plugin ZIP, then copy them to `Package/Mods` and `Package` respectively.
 
 Only 1P MISS triggers are enabled by default. GOOD, GREAT, PERFECT, CRITICAL, 2P, same-frame strength stacking, and result triggers can be enabled independently in the DGHub plugin configuration.
 
@@ -51,7 +52,7 @@ The launcher checks the `odd` driver, starts AMDaemon first, then starts Sinmai 
 
 ## Bridge configuration
 
-`MaiDGBridge.ini`:
+`XiaoLanMaiBrdge.ini`:
 
 ```ini
 Enabled=true
@@ -96,7 +97,8 @@ Menu and song-select presence:
 ```
 
 When available, live and result events also include the current song title,
-artist, chart name, display level, chart constant, and progress from 0 to 1.
+artist, chart name, display level, chart constant, elapsed song seconds, total song seconds,
+and a compatibility progress value from 0 to 1 calculated from those timestamps.
 These fields are optional so older or heavily modified packages can fall back
 to the track number and judgement counters.
 
@@ -127,8 +129,8 @@ On the target 1.55 package, live MISS capture, DGHub triggering, device output, 
 After the game starts, `Package/MelonLoader/Latest.log` should contain:
 
 ```text
-MaiDGBridge judge hook installed
-MaiDGBridge listening on http://127.0.0.1:8891/events
+XiaoLanMaiBrdge judge hook installed
+XiaoLanMaiBrdge listening on http://127.0.0.1:8891/events
 ```
 
 You can inspect the event stream while the game is running:
@@ -137,11 +139,11 @@ You can inspect the event stream while the game is running:
 curl.exe -N http://127.0.0.1:8891/events
 ```
 
-If the port is already in use, change both `MaiDGBridge.ini` and the DGHub plugin endpoint.
+If the port is already in use, change both `XiaoLanMaiBrdge.ini` and the DGHub plugin endpoint.
 
 ## Uninstallation
 
-First remove or disable the `maimai_link` plugin in DGHub so it cannot reinstall the bridge. Then remove `Package/Mods/MaiDGBridge.dll`, `Package/MaiDGBridge.ini`, and `Package/MaiDGBridge.dghub.json`. Backups under `Package/MaiDGBridge.backups` may be retained or removed separately. The project doesn't modify the game's original assemblies or AquaMai configuration.
+First remove or disable the `maimai_link` plugin in DGHub so it cannot reinstall the bridge. Then remove `Package/Mods/XiaoLanMaiBrdge.dll`, `Package/XiaoLanMaiBrdge.ini`, and `Package/XiaoLanMaiBrdge.dghub.json`. Backups under `Package/XiaoLanMaiBrdge.backups` may be retained or removed separately. The project doesn't modify the game's original assemblies or AquaMai configuration.
 
 ## Building
 

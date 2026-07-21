@@ -5,6 +5,10 @@ import sys
 import zipfile
 
 
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+VERSION_INFO = json.loads((ROOT / "bridge" / "version.json").read_text(encoding="utf-8"))
+
+
 REQUIRED = {
     "manifest.json",
     "main.py",
@@ -12,8 +16,8 @@ REQUIRED = {
     "SOURCE.md",
     "LICENSE",
     "payload/bridge.json",
-    "payload/MaiDGBridge.dll",
-    "payload/MaiDGBridge.ini",
+    "payload/XiaoLanMaiBrdge.dll",
+    "payload/XiaoLanMaiBrdge.ini",
 }
 
 
@@ -36,11 +40,11 @@ def main():
 
         manifest = json.loads(read("manifest.json").decode("utf-8-sig"))
         descriptor = json.loads(read("payload/bridge.json").decode("utf-8-sig"))
-        dll_hash = hashlib.sha256(read("payload/MaiDGBridge.dll")).hexdigest()
+        dll_hash = hashlib.sha256(read("payload/XiaoLanMaiBrdge.dll")).hexdigest()
 
     assert manifest["id"] == expected_id, manifest
     assert manifest["version"] == descriptor["plugin_version"], descriptor
-    assert descriptor["bridge_version"] == manifest["version"], descriptor
+    assert descriptor["bridge_version"] == VERSION_INFO["bridge_version"], descriptor
     assert descriptor["sha256"] == dll_hash, descriptor
     assert manifest["author"] == "XiaoLan9999", manifest
     all_fields = {
